@@ -4,14 +4,14 @@
     <script>document.documentElement.classList.remove('no-js');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>André Ataíde — IT Risk & Security Engineering</title>
-    <meta name="description" content="IT Risk, GRC, and security engineering. Open-source tooling in Go: Vexil, Wardex.">
+    <title>André Ataíde — Security Governance & Advisory</title>
+    <meta name="description" content="Security governance for regulated products. CRA compliance, release gates, and audit-ready evidence.">
     <meta name="author" content="André Ataíde">
 
-    <!-- Open Graph (LinkedIn preview) -->
+    <!-- Open Graph -->
     <meta property="og:title" content="André Ataíde">
-    <meta property="og:description" content="IT Risk · Security Engineering · Open Source">
-    <meta property="og:url" content="https://hadnu.github.io">
+    <meta property="og:description" content="Security Governance · GRC Advisory · Open Source">
+    <meta property="og:url" content="https://had-nu.github.io/hadnu.github.io/">
     <meta property="og:type" content="website">
 
     <!-- Fonts -->
@@ -33,6 +33,7 @@
                 </button>
                 <div class="nav-links" id="navLinks">
                     <a href="#about">about</a>
+                    <a href="#problems">problems</a>
                     <a href="#projects">projects</a>
                     <a href="#publications">publications</a>
                     <a href="writing/index.html">writing</a>
@@ -42,35 +43,65 @@
     </header>
 
     <main class="container">
-        
+
         <section class="hero">
             <h1>André Ataíde</h1>
-            <p class="tagline mono-font">IT Risk · Security Engineering · Open Source</p>
+            <p class="tagline mono-font">Security Governance · GRC Advisory · Open Source</p>
             <p class="location">Portugal</p>
             <div class="social-links">
                 <a href="https://github.com/had-nu" target="_blank" rel="noopener">GitHub</a>
                 <a href="#" data-todo="true">LinkedIn</a>
-                <a href="#" data-todo="true">arXiv</a>
+                <a href="mailto:andre.ataide@proton.me">Email</a>
             </div>
         </section>
 
         <section id="about">
             <h2 class="section-title">about</h2>
             <p>
-                I work at the intersection of IT Risk, GRC, and security engineering. My focus is on making security decisions traceable — connecting detection output, compliance controls, and release gates into systems that produce audit evidence, not just alerts.
+                I help technology teams prepare the evidence that regulators, auditors, and investors require — without slowing down delivery.
             </p>
             <p>
-                I build open-source tooling in Go that operationalises these ideas: entropy-based secret detection, risk-driven release gates, and the supporting infrastructure between them.
+                My work sits at the intersection of security governance, GRC, and engineering. I build systems that connect detection output, compliance controls, and release gates into audit trails that are ready when the regulator asks.
             </p>
+            <p>
+                Everything I produce is grounded in the EU Cyber Resilience Act (CRA), ISO 27001, NIS2, and DORA. I also build open-source tooling — Wardex, Vexil — that turns these requirements into working software.
+            </p>
+        </section>
+
+        <section id="problems">
+            <h2 class="section-title">problems I solve</h2>
+            <div class="problem-grid">
+                <div class="problem-card">
+                    <h3>01</h3>
+                    <h4>No active detection pipeline</h4>
+                    <p>
+                        Knowing a CVE exists in the NVD is not the same as knowing it is being actively exploited. Without correlation against CISA KEV, the CRA Article 14 notification clock starts running without the organisation knowing.
+                    </p>
+                </div>
+                <div class="problem-card">
+                    <h3>02</h3>
+                    <h4>No decision evidence</h4>
+                    <p>
+                        Regulators do not ask for the patch — they ask for the record of who assessed the risk, when, with what criteria, and what was decided. A Jira ticket and a git commit are not that record.
+                    </p>
+                </div>
+                <div class="problem-card">
+                    <h3>03</h3>
+                    <h4>Knowing ≠ demonstrating</h4>
+                    <p>
+                        An organisation can have solid internal processes and still fail CRA compliance — because it did not produce the artifacts the regulation requires as proof. Annex VII must exist on paper.
+                    </p>
+                </div>
+            </div>
         </section>
 
         <section id="projects">
             <h2 class="section-title">projects</h2>
             <div class="project-grid">
-                <!-- Vexil -->
+                <!-- Wardex -->
                 <div class="project-card">
-                    <h3><a href="https://github.com/had-nu/vexil" target="_blank" rel="noopener">Vexil</a></h3>
-                    <p class="tagline">Shannon entropy secret detection for air-gapped environments</p>
+                    <h3><a href="https://github.com/had-nu/wardex" target="_blank" rel="noopener">Wardex</a></h3>
+                    <p class="tagline">Risk-driven release gate engine. CRA Art. 14 notification artifacts, KEV correlation, and HMAC-chained audit trail.</p>
                     <div class="footer">
                         <div class="project-tags">
                             <span class="tag">Go</span>
@@ -79,10 +110,10 @@
                     </div>
                 </div>
 
-                <!-- Wardex -->
+                <!-- Vexil -->
                 <div class="project-card">
-                    <h3><a href="https://github.com/had-nu/wardex" target="_blank" rel="noopener">Wardex</a></h3>
-                    <p class="tagline">Risk-driven release gate engine</p>
+                    <h3><a href="https://github.com/had-nu/vexil" target="_blank" rel="noopener">Vexil</a></h3>
+                    <p class="tagline">Shannon entropy secret detection for air-gapped environments, with token/credential bifurcation.</p>
                     <div class="footer">
                         <div class="project-tags">
                             <span class="tag">Go</span>
@@ -94,24 +125,12 @@
                 <!-- lazy.go -->
                 <div class="project-card">
                     <h3><a href="https://github.com/had-nu/lazy.go" target="_blank" rel="noopener">lazy.go</a></h3>
-                    <p class="tagline">Go project scaffolding tool</p>
+                    <p class="tagline">Go project scaffolding with opinionated defaults and built-in toolchain integration.</p>
                     <div class="footer">
                         <div class="project-tags">
                             <span class="tag">Go</span>
                         </div>
                         <span class="badge">stable</span>
-                    </div>
-                </div>
-
-                <!-- Prana Network -->
-                <div class="project-card">
-                    <h3><a href="https://github.com/had-nu/prana" target="_blank" rel="noopener">Prana Network</a></h3>
-                    <p class="tagline">Distributed reputation-based blockchain protocol</p>
-                    <div class="footer">
-                        <div class="project-tags">
-                            <span class="tag">Go</span>
-                        </div>
-                        <span class="badge">research</span>
                     </div>
                 </div>
             </div>
@@ -129,8 +148,6 @@
                         Formalises the scope boundary of Shannon entropy as a secret discriminator, introducing a token_class / credential_class bifurcation and a composite classifier for air-gapped environments.
                     </p>
                 </div>
-                <!-- If no publications, uncomment the below and comment out the above -->
-                <!-- <p class="empty-state">No publications yet. Preprint forthcoming.</p> -->
             </div>
         </section>
 
@@ -138,7 +155,10 @@
 
     <footer class="container">
         <div class="footer-content">
-            <p>© André Ataíde · hadnu.github.io · Built with HTML/CSS</p>
+            <p>André Ataíde · Security Governance Advisory</p>
+            <p class="mono-font" style="font-size: var(--text-sm); color: var(--text-muted);">
+                <a href="mailto:andre.ataide@proton.me">andre.ataide@proton.me</a>
+            </p>
             <div class="footer-links">
                 <a href="https://github.com/had-nu" target="_blank" rel="noopener">GitHub</a>
                 <a href="#" data-todo="true">LinkedIn</a>
