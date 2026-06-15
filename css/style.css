@@ -1,25 +1,11 @@
 :root {
-  --bg:           #0d0d0d;
-  --surface:      #141414;
-  --border:       #1a1a1a;
-  --border-hover: #333333;
-  --text-primary: #e8e8e8;
-  --text-muted:   #888888;
-  --accent:       #e8e8e8;
-  --accent-warm:  #c8b89a;
+  --bg:        #ffffff;
+  --text:      #1a1a1a;
+  --muted:     #888888;
+  --border:    #e5e5e5;
 
-  --text-xs:   0.75rem;
-  --text-sm:   0.8125rem;
-  --text-base: 1rem;
-  --text-lg:   1.125rem;
-  --text-xl:   1.75rem;
-  --text-2xl:  2.5rem;
-  --text-4xl:  4rem;
-  --text-6xl:  6rem;
-
-  --max-width: 760px;
-  --padding-x: 1.5rem;
-  --transition: 300ms cubic-bezier(0.2, 0.1, 0, 1);
+  --max-width: 640px;
+  --pad:       2rem;
 }
 
 * {
@@ -28,398 +14,232 @@
   padding: 0;
 }
 
-html {
-  scroll-behavior: smooth;
-}
-
 body {
-  background-color: var(--bg);
-  color: var(--text-primary);
-  font-family: 'DM Sans', sans-serif;
-  line-height: 1.6;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 1rem;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
-}
-
-h1, h2, h3, .display-font {
-  font-family: 'DM Serif Display', serif;
-  font-weight: 400;
-  color: var(--accent-warm);
-  letter-spacing: -0.01em;
-}
-
-code, .mono-font {
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 300;
 }
 
 a {
   color: inherit;
-  text-decoration: none;
-  transition: color var(--transition), border-color var(--transition);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--border);
+  transition: text-decoration-color 200ms;
 }
 
 a:hover {
-  color: var(--accent-warm);
+  text-decoration-color: var(--text);
 }
 
-ul {
-  list-style: none;
-}
-
-.container {
+main {
   max-width: var(--max-width);
   margin: 0 auto;
-  padding: 0 var(--padding-x);
+  padding: 0 var(--pad);
 }
 
-section {
-  padding-top: 6rem;
-}
-
-/* Header & Nav */
+/* Header */
 header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background-color: rgba(13, 13, 13, 0.8);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--border);
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 2rem var(--pad) 0;
 }
 
 nav {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 4rem;
 }
 
 .logo {
-  font-size: var(--text-lg);
-  color: var(--accent-warm);
-}
-
-.nav-links {
-  display: flex;
-  gap: 2rem;
+  font-size: 1rem;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--text);
 }
 
 .nav-links a {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  font-weight: 400;
-  letter-spacing: 0.02em;
+  font-size: 0.875rem;
+  color: var(--muted);
+  text-decoration: none;
 }
 
-.nav-links a:hover, .nav-links a.active {
-  color: var(--text-primary);
+.nav-links a:hover {
+  color: var(--text);
 }
 
-.menu-toggle {
-  display: none;
-  background: none;
-  border: none;
-  color: var(--text-primary);
-  cursor: pointer;
-  padding: 0.5rem;
-  z-index: 101;
+/* Intro */
+.intro {
+  padding: 5rem 0 1.5rem;
 }
 
-/* Hero */
-.hero {
-  padding-top: 8rem;
-  padding-bottom: 4rem;
-  animation: fadeUp 800ms ease-out forwards;
+.intro p {
+  font-size: 1.125rem;
+  margin-bottom: 0.25rem;
 }
 
-.hero h1 {
-  font-size: var(--text-4xl);
-  line-height: 1.1;
-  margin-bottom: 1rem;
+.links {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
 }
 
-.hero .tagline {
-  font-size: var(--text-lg);
-  color: var(--text-muted);
-  margin-bottom: 0.5rem;
+.links a {
+  text-decoration: underline;
 }
 
-.hero .location {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  opacity: 0.7;
+.sep {
+  color: var(--border);
+  margin: 0 0.4rem;
 }
 
-.social-links {
-  display: flex;
-  gap: 1.5rem;
-  margin-top: 2rem;
+.text-muted {
+  color: var(--muted);
+  font-size: 0.875rem;
 }
 
-.social-links a {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  border-bottom: 1px solid transparent;
-}
-
-.social-links a:hover {
-  color: var(--text-primary);
-  border-bottom-color: var(--text-primary);
+.page-title {
+  font-size: 1.25rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
 }
 
 /* About */
-#about p {
-  font-size: var(--text-base);
-  margin-bottom: 1.5rem;
-  max-width: 600px;
+.about {
+  padding: 2rem 0;
 }
 
-/* Projects */
-.section-title {
-  font-size: var(--text-xl);
-  margin-bottom: 2rem;
-  color: var(--text-muted);
-  text-transform: lowercase;
+.about p {
+  margin-bottom: 1rem;
 }
 
-.project-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
+/* Entries */
+.entries {
+  padding: 1.5rem 0;
 }
 
-.project-card {
-  background-color: var(--surface);
-  border: 1px solid var(--border);
-  padding: 1.75rem;
-  border-radius: 2px;
+.section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 2.5rem 0 1.25rem;
+}
+
+.section-label:first-of-type {
+  margin-top: 0;
+}
+
+.entry {
+  margin-bottom: 1.75rem;
+}
+
+.entry h3 {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 0.15rem;
+}
+
+.entry h3 a {
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.entry h3 a:hover {
+  text-decoration: underline;
+}
+
+.entry p {
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+  line-height: 1.55;
+}
+
+.entry-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
   display: flex;
-  flex-direction: column;
-  height: 100%;
-  transition: border-color var(--transition), transform var(--transition);
-}
-
-.project-card:hover {
-  border-color: var(--border-hover);
-  transform: translateY(-2px);
-}
-
-.project-card h3 {
-  font-size: var(--text-lg);
-  margin-bottom: 0.5rem;
-}
-
-.project-card .tagline {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  margin-bottom: 2rem;
-  flex-grow: 1;
-  line-height: 1.5;
-}
-
-.project-card .footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-}
-
-.project-tags {
-  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   flex-wrap: wrap;
-  gap: 0.5rem;
 }
 
 .tag {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  background-color: var(--bg);
-  padding: 0.2rem 0.5rem;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.6875rem;
+  color: var(--muted);
   border: 1px solid var(--border);
+  padding: 0.1rem 0.45rem;
+  border-radius: 3px;
 }
 
-.badge {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: var(--text-xs);
-  color: var(--accent-warm);
-  text-transform: lowercase;
+.status {
+  font-size: 0.6875rem;
+  font-weight: 500;
 }
 
-/* Problems */
-.problem-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
+.status.active {
+  color: #2e7d32;
 }
 
-.problem-card {
-  background-color: var(--surface);
-  border: 1px solid var(--border);
-  padding: 2rem;
-  border-radius: 2px;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  transition: border-color var(--transition);
+.status.stable {
+  color: #1565c0;
 }
 
-.problem-card:hover {
-  border-color: var(--border-hover);
-}
-
-.problem-card h3 {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  margin-bottom: 0.75rem;
-}
-
-.problem-card h4 {
-  font-size: var(--text-base);
-  color: var(--text-primary);
-  margin-bottom: 0.75rem;
-  line-height: 1.3;
-}
-
-.problem-card p {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  line-height: 1.6;
-  flex-grow: 1;
-}
-
-@media (max-width: 760px) {
-  .problem-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Publications */
-.pub-list {
-  display: flex;
-  flex-direction: column;
-  gap: 3rem;
-}
-
-.pub-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.pub-item h3 {
-  font-size: var(--text-lg);
-  line-height: 1.3;
-}
-
-.pub-meta {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-}
-
-.pub-abstract {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  margin-top: 0.5rem;
-}
-
-.empty-state {
-  color: var(--text-muted);
-  font-style: italic;
-  font-size: var(--text-sm);
+.status.research {
+  color: #6a1b9a;
 }
 
 /* Footer */
 footer {
-  padding: 6rem 0 4rem;
-  border-top: 1px solid var(--border);
-  margin-top: 6rem;
-}
-
-.footer-content {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 3rem var(--pad) 4rem;
+  border-top: 1px solid var(--border);
+  margin-top: 2rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
 }
 
-.footer-links {
-  display: flex;
-  gap: 1rem;
+footer p, footer .email {
+  margin-bottom: 0.15rem;
 }
 
-/* Animations */
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+footer .email {
+  font-size: 0.8125rem;
+}
+
+footer .email a {
+  text-decoration: none;
+  color: var(--muted);
+}
+
+footer .email a:hover {
+  color: var(--text);
+}
+
+footer .links {
+  margin-top: 0.5rem;
 }
 
 /* Responsive */
-@media (max-width: 760px) {
-  .hero h1 {
-    font-size: var(--text-4xl);
-  }
-  
-  .project-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 600px) {
+  :root {
+    --pad: 1.25rem;
   }
 
-  .nav-links {
-    display: flex; /* Visible by default for graceful degradation */
-    flex-direction: column;
-    position: absolute;
-    top: 4rem;
-    left: 0;
-    right: 0;
-    background-color: var(--bg);
-    padding: 2rem var(--padding-x);
-    gap: 1.5rem;
-    border-bottom: 1px solid var(--border);
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-10px);
-    transition: opacity var(--transition), transform var(--transition), visibility var(--transition);
+  .intro {
+    padding-top: 3rem;
   }
 
-  /* When JS is not available, .nav-links is visible but static? 
-     Actually, let's make it visible by default if NO JS, 
-     and JS will hide it/handle it. 
-  */
-  
-  .nav-links.active {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-  }
-
-  .no-js .nav-links {
-    display: flex;
-    position: static;
-    opacity: 1;
-    visibility: visible;
-    transform: none;
-    padding: 1rem 0;
-    border: none;
-  }
-
-  .no-js .menu-toggle {
-    display: none;
-  }
-
-  .menu-toggle {
-    display: block;
-  }
-}
-
-@media (min-width: 1024px) {
-  .hero h1 {
-    font-size: var(--text-6xl);
+  footer {
+    gap: 0.75rem;
   }
 }
