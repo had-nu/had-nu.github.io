@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Why Your CI Pipeline is Blocking the Wrong Deployments — Wardex — André Ataíde</title>
+    <meta name="description" content="CVSS-only gates block everything or nothing. Wardex introduces asset context — the same CVE can be ALLOW, WARN, or BLOCK depending on where it lives.">
+    <meta name="author" content="André Ataíde">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/blog.css">
+</head>
+<body>
+
+<header>
+    <nav>
+        <a href="/" class="logo">André Ataíde</a>
+        <div class="nav-links">
+            <a href="index.html">writing</a>
+        </div>
+    </nav>
+</header>
+
+<main>
+
+<article>
+
+<header class="article-header">
+    <p class="article-date">June 16, 2026</p>
+    <h1>Why Your CI Pipeline is Blocking the Wrong Deployments</h1>
+    <p class="article-subtitle">CVSS-only gates create false positives and false negatives. Context-aware gating fixes both.</p>
+</header>
+
+<div class="article-body">
+
+<p>Most security gates in CI/CD pipelines follow a simple rule: if CVSS >= 9.0, block. This rule is wrong in both directions.</p>
+
+<p>It blocks deployments for vulnerabilities that cannot reach production data, and it passes deployments for critical vulnerabilities in critical assets that happen to score 8.9. The problem is not the threshold — it is the absence of context.</p>
+
+<h2>The CVSS-only trap</h2>
+
+<p>CVSS measures intrinsic severity. It does not measure:</p>
+
+<ul>
+    <li>Whether the vulnerable component is reachable from the network</li>
+    <li>Whether authentication is required to trigger it</li>
+    <li>Whether the asset is internet-facing or isolated in an air-gapped network</li>
+    <li>Whether compensating controls (WAF, network segmentation, EDR) already mitigate the vector</li>
+</ul>
+
+<p>A CVE-2024-1234 with CVSS 9.8 in a non-reachable library behind three network zones is not an emergency. But a CVSS 8.2 in the authentication gateway of a payment API is. A static threshold treats both identically.</p>
+
+<h2>Context-aware risk scoring</h2>
+
+<p>Wardex evaluates each vulnerability in the context of the asset that contains it:</p>
+
+<pre>R(v, α) = (CVSS/10) × EPSS × C(α) × E(α) × (1 − Φ(α))</pre>
+
+<p>The variables per asset:</p>
+
+<ul>
+    <li><strong>C(α)</strong> — criticality: is this a payment API (0.9) or an internal wiki (0.3)?</li>
+    <li><strong>E(α)</strong> — exposure: internet-facing, requires auth, internal-only?</li>
+    <li><strong>Φ(α)</strong> — compensating controls: WAF (0.35), network isolation (0.50), EDR (0.20)</li>
+</ul>
+
+<p>The result is a single number on the same scale as your risk appetite. The same vulnerability can be BLOCK in one asset and ALLOW in another — not because the severity changed, but because the context did.</p>
+
+<h2>What changes in practice</h2>
+
+<p>We calibrated Wardex against 237 real CVEs with EPSS scores from the FIRST.org dataset.</p>
+
+<table style="width:100%; border-collapse: collapse; font-size:0.875rem; margin:1rem 0;">
+    <tr><th style="text-align:left; border-bottom:1px solid var(--border); padding:0.4rem;">Profile</th><th style="text-align:left; border-bottom:1px solid var(--border); padding:0.4rem;">Risk Appetite</th><th style="text-align:left; border-bottom:1px solid var(--border); padding:0.4rem;">BLOCK</th><th style="text-align:left; border-bottom:1px solid var(--border); padding:0.4rem;">ALLOW</th></tr>
+    <tr><td style="border-bottom:1px solid var(--border); padding:0.4rem;">Bank (DORA)</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">0.5</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">176</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">57</td></tr>
+    <tr><td style="border-bottom:1px solid var(--border); padding:0.4rem;">Hospital (HIPAA)</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">0.8</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">168</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">63</td></tr>
+    <tr><td style="border-bottom:1px solid var(--border); padding:0.4rem;">SaaS startup</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">2.0</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">111</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">86</td></tr>
+    <tr><td style="border-bottom:1px solid var(--border); padding:0.4rem;">Energy (NIS2)</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">0.3</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">180</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">53</td></tr>
+</table>
+
+<p>A SaaS startup with risk appetite 2.0 blocks roughly half the vulnerabilities that a NIS2 energy operator must block. This is not regulatory arbitrage — it is proportional risk management, which is what most regulations explicitly require.</p>
+
+<h2>Integrating with CI/CD</h2>
+
+<p>The integration is a single step in a GitHub Actions workflow:</p>
+
+<pre>- name: Evaluate risk gate
+  run: |
+    wardex evaluate \
+      --config .wardex/config.yaml \
+      --evidence vulns.yaml \
+      controls.yaml</pre>
+
+<p>Wardex exits with <code>0</code> for ALLOW, <code>10</code> for BLOCK, and <code>11</code> for compliance gaps. The pipeline either proceeds or fails — but the failure is based on actual risk, not on a static CVSS number.</p>
+
+<h2>EPSS enrichment when scanners do not provide it</h2>
+
+<p>Not every scanner includes EPSS in its output. When it does not, Wardex assumes the worst case (EPSS 1.0) until enrichment runs:</p>
+
+<pre>$ wardex enrich epss wardex-vulns.yaml --output epss-enrich.yaml
+$ wardex evaluate --epss-enrichment epss-enrich.yaml \
+    --evidence vulns.yaml controls.yaml</pre>
+
+<p>The enrichment consults api.first.org and signs each result via HMAC-SHA256. This prevents tampering with probability scores that directly affect gate decisions.</p>
+
+<h2>The bottom line</h2>
+
+<p>A security gate that cannot distinguish between a Log4Shell in a DMZ and a minimist in a build tool is not a gate — it is a noise generator. Context-aware gating reduces unnecessary blocks, surfaces genuinely critical decisions, and produces audit evidence that explains why each decision was made.</p>
+
+<p>The <a href="https://github.com/had-nu/wardex">Wardex repository</a> has the full model, configuration examples, and a calibration dataset you can run against your own inventory.</p>
+
+</div>
+
+<footer class="article-nav">
+    <a href="index.html">← Back to writing</a>
+</footer>
+
+</article>
+
+</main>
+
+<footer>
+    <p>André Ataíde · Security Governance Advisory</p>
+    <p class="email"><a href="mailto:andre_ataide@proton.me">andre_ataide@proton.me</a></p>
+    <div class="links">
+        <a href="https://github.com/had-nu" target="_blank">GitHub</a>
+        <span class="sep">/</span>
+        <a href="https://www.linkedin.com/in/andre-ataide/" target="_blank">LinkedIn</a>
+        <span class="sep">/</span>
+        <a href="https://medium.com/@hadnu" target="_blank">Medium</a>
+        <span class="sep">/</span>
+        <a href="https://mastodon.social/@hadnu" target="_blank">Mastodon</a>
+    </div>
+</footer>
+
+</body>
+</html>

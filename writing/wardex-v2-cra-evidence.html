@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wardex v2.0: CRA Article 14 Evidence, KEV Correlation, and Risk-Driven Release Gates — André Ataíde</title>
+    <meta name="description" content="Wardex v2.0 transforms vulnerability scanners into CRA-compliant audit evidence. KEV correlation, HMAC-signed notification artifacts, and release gates that understand asset context.">
+    <meta name="author" content="André Ataíde">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/blog.css">
+</head>
+<body>
+
+<header>
+    <nav>
+        <a href="/" class="logo">André Ataíde</a>
+        <div class="nav-links">
+            <a href="index.html">writing</a>
+        </div>
+    </nav>
+</header>
+
+<main>
+
+<article>
+
+<header class="article-header">
+    <p class="article-date">June 16, 2026</p>
+    <h1>Wardex v2.0: CRA Article 14 Evidence, KEV Correlation, and Risk-Driven Release Gates</h1>
+    <p class="article-subtitle">Turning vulnerability scanners into CRA-compliant audit evidence without changing how your team ships.</p>
+</header>
+
+<div class="article-body">
+
+<p>The Cyber Resilience Act Article 14 enters force in September 2026. If your software ships to the EU market, you need a notification pipeline for actively exploited vulnerabilities — not just a policy, but demonstrable evidence of detection, assessment, and decision.</p>
+
+<p>Wardex v2.0 implements the full notification path. It takes what your scanner already produces and transforms it into signed, dated, chained audit artifacts that survive regulatory scrutiny.</p>
+
+<h2>The problem with scanner output</h2>
+
+<p>A Grype or Trivy JSON output tells you what CVEs exist. It does not tell you:</p>
+
+<ul>
+    <li>Which of those CVEs are being actively exploited right now</li>
+    <li>Whether the asset context (criticality, exposure, compensating controls) changes the risk calculus</li>
+    <li>Who decided what, when, and with what criteria</li>
+</ul>
+
+<p>For CRA compliance, the third point is the one that matters most. The regulation does not ask for the patch — it asks for the record of who assessed the risk, when, and what was decided.</p>
+
+<h2>KEV correlation: from noise to signal</h2>
+
+<p>The first step is knowing which CVEs in your inventory are being actively exploited. Wardex correlates scanner output against the CISA Known Exploited Vulnerabilities catalog:</p>
+
+<pre>$ curl -sSL https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json \
+    -o kev-catalogue.json
+
+$ wardex convert grype grype-output.json --kev kev-catalogue.json</pre>
+
+<p>The output is a structured YAML file with each vulnerability annotated with <code>actively_exploited: true/false</code>, KEV dateAdded, and CISA notes. This is the input to the release gate evaluation.</p>
+
+<h2>Active exploitation hard stop (exit code 12)</h2>
+
+<p>When a vulnerability is actively exploited, Wardex introduces a hard stop distinct from normal gate blocking:</p>
+
+<pre>$ wardex evaluate --evidence vulns.yaml --config wardex-config.yaml
+
+# Exit code: 12 (ActivelyExploited)
+# This cannot be overridden by risk acceptance</pre>
+
+<p>The <code>12</code> exit code is intentional — it must be handled explicitly in CI/CD pipelines. Unlike the standard gate block (exit 10), an active exploitation stop:</p>
+
+<ul>
+    <li>Generates a CRA Article 14 notification artifact signed with HMAC-SHA256</li>
+    <li>Records a chained audit entry tracking the three CRA deadlines: early warning (72h), detailed report, and final report</li>
+    <li>Cannot be silenced by risk acceptance</li>
+</ul>
+
+<h2>The Article 14 artifact lifecycle</h2>
+
+<p>Once an active exploitation is detected, Wardex manages the full notification lifecycle:</p>
+
+<pre>$ wardex art14 list
+$ wardex art14 show &lt;artifact-id&gt;
+$ wardex art14 verify &lt;artifact-id&gt;
+$ wardex art14 mark-dispatched &lt;artifact-id&gt; --phase early-warning
+$ wardex art14 finalize &lt;artifact-id&gt; --patch-date 2026-06-09T12:00:00Z</pre>
+
+<p>Each artifact is HMAC-signed and chained to the previous one, producing an append-only audit trail. This is what a regulator asks for — not a screenshot of a Jira ticket, but a cryptographic chain of custody from detection to notification to patch confirmation.</p>
+
+<h2>Risk-driven release gates</h2>
+
+<p>Outside active exploitation, the release gate evaluates risk using asset context:</p>
+
+<pre>R(v, α) = (CVSS/10) × EPSS × C(α) × E(α) × (1 − Φ(α))</pre>
+
+<p>Where <code>C</code> is asset criticality, <code>E</code> is exposure, and <code>Φ</code> is compensating control effectiveness (capped at 0.80). The same CVE produces different outcomes depending on where it lives:</p>
+
+<table style="width:100%; border-collapse: collapse; font-size:0.875rem; margin:1rem 0;">
+    <tr><th style="text-align:left; border-bottom:1px solid var(--border); padding:0.4rem;">CVE</th><th style="text-align:left; border-bottom:1px solid var(--border); padding:0.4rem;">CVSS</th><th style="text-align:left; border-bottom:1px solid var(--border); padding:0.4rem;">EPSS</th><th style="text-align:left; border-bottom:1px solid var(--border); padding:0.4rem;">Bank</th><th style="text-align:left; border-bottom:1px solid var(--border); padding:0.4rem;">SaaS</th></tr>
+    <tr><td style="border-bottom:1px solid var(--border); padding:0.4rem;">Log4Shell</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">10.0</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">0.94</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">BLOCK</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">BLOCK</td></tr>
+    <tr><td style="border-bottom:1px solid var(--border); padding:0.4rem;">curl SOCKS5</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">9.8</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">0.26</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">BLOCK</td><td style="border-bottom:1px solid var(--border); padding:0.4rem;">WARN</td></tr>
+    <tr><td style="padding:0.4rem;">minimist</td><td style="padding:0.4rem;">9.8</td><td style="padding:0.4rem;">0.01</td><td style="padding:0.4rem;">ALLOW</td><td style="padding:0.4rem;">ALLOW</td></tr>
+</table>
+
+<p>The same CVE-2024-1234 with EPSS 0.01 is ALLOW in every profile. The gate blocks based on risk, not on CVSS panic. This reduces unnecessary pipeline failures while maintaining regulatory coverage.</p>
+
+<h2>What this means for CRA compliance</h2>
+
+<p>By September 2026, any manufacturer of products with digital elements sold in the EU must demonstrate:</p>
+
+<ul>
+    <li>Active monitoring for exploitable vulnerabilities</li>
+    <li>Notification to ENISA within 72 hours of confirmed exploitation</li>
+    <li>Audit trail of all decisions</li>
+</ul>
+
+<p>Wardex v2.0 covers the pipeline from scanner output to signed notification artifact. It does not replace your vulnerability scanner or your SIEM — it sits between them and produces the evidence that makes the regulation auditable.</p>
+
+<h2>Try it</h2>
+
+<pre>$ go install github.com/had-nu/wardex@v2.0.0</pre>
+
+<p>The <a href="https://github.com/had-nu/wardex">repository</a> has full documentation, including a <a href="https://github.com/had-nu/wardex/blob/main/doc/operations/WARDEX_PLAYBOOK.md">playbook</a> with complete command flows for each use case.</p>
+
+</div>
+
+<footer class="article-nav">
+    <a href="index.html">← Back to writing</a>
+</footer>
+
+</article>
+
+</main>
+
+<footer>
+    <p>André Ataíde · Security Governance Advisory</p>
+    <p class="email"><a href="mailto:andre_ataide@proton.me">andre_ataide@proton.me</a></p>
+    <div class="links">
+        <a href="https://github.com/had-nu" target="_blank">GitHub</a>
+        <span class="sep">/</span>
+        <a href="https://www.linkedin.com/in/andre-ataide/" target="_blank">LinkedIn</a>
+        <span class="sep">/</span>
+        <a href="https://medium.com/@hadnu" target="_blank">Medium</a>
+        <span class="sep">/</span>
+        <a href="https://mastodon.social/@hadnu" target="_blank">Mastodon</a>
+    </div>
+</footer>
+
+</body>
+</html>

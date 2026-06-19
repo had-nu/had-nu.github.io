@@ -1,7 +1,7 @@
 # SPEC: hadnu.github.io — Personal Site
 
-**Target URL:** https://hadnu.github.io  
-**Repositório:** `hadnu/hadnu.github.io`  
+**Target URL:** https://had-nu.github.io/  
+**Repositório:** `had-nu/had-nu.github.io`  
 **Autor:** André Ataíde  
 **Versão da spec:** 1.0  
 
