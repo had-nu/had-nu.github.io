@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="André Ataíde">
+    <meta name="description" content="Wardex v2.1 adds Docker images, GitHub Action, NIST CSF catalog, and HTML report generation to the CRA Article 14 compliance pipeline. Technical walkthrough of what changed and why.">
+    <title>Wardex v2.1: Containerization, CI/CD Integration, and Multi-Framework Expansion — André Ataíde</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+            line-height: 1.6;
+            color: #1a1a1a;
+            background: #fafafa;
+        }
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        header {
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 1rem;
+        }
+        header a {
+            color: #1a1a1a;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        header a:hover { text-decoration: underline; }
+        .breadcrumb {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+        .date { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+        h1 {
+            font-size: 1.8rem;
+            margin: 1.5rem 0 1rem 0;
+            line-height: 1.3;
+        }
+        h2 {
+            font-size: 1.3rem;
+            margin: 2rem 0 1rem 0;
+            margin-top: 2.5rem;
+        }
+        h3 {
+            font-size: 1.1rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: "Monaco", "Menlo", "Ubuntu Mono", "Courier New", monospace;
+            font-size: 0.9rem;
+        }
+        pre {
+            background: #f5f5f5;
+            border-left: 3px solid #ddd;
+            padding: 1rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            border-radius: 4px;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.85rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        table th, table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        table th {
+            background: #f9f9f9;
+            font-weight: 600;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover { text-decoration: underline; }
+        footer {
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e0e0e0;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        footer a {
+            margin-right: 1rem;
+        }
+        .meta { font-size: 0.85rem; color: #999; }
+        blockquote {
+            border-left: 3px solid #ccc;
+            padding-left: 1rem;
+            margin: 1rem 0;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div><a href="https://had-nu.github.io/">André Ataíde</a></div>
+            <div class="breadcrumb"><a href="https://had-nu.github.io/writing/index.html">writing</a></div>
+        </header>
+
+        <div class="date">June 20, 2026</div>
+        <h1>Wardex v2.1: Containerization, CI/CD Integration, and Multi-Framework Expansion</h1>
+        <p><em>Docker images, GitHub Action, NIST CSF catalog, HTML reports — and what each actually enables.</em></p>
+
+        <h2>Problem</h2>
+
+        <p>Wardex v2.0 implemented a risk-based release gate with HMAC-signed CRA Article 14 artefact lifecycle. Running it required a Go toolchain or a precompiled binary. Integrating into CI/CD meant wrapping the binary in a custom container. Compliance reporting required piping JSON output into separate tools. Framework evaluation was limited to ISO 27001, NIS2, and DORA — which maps to part of the European regulatory landscape but omits the framework most organizations use as their base: NIST CSF.</p>
+
+        <p>v2.1 addresses these integration gaps. No new risk model, no new artefact types — the evaluation engine and Article 14 pipeline are unchanged. The work is in deployment surface and framework coverage.</p>
+
+        <h2>What changed</h2>
+
+        <h3>Containerization (Docker + GHCR)</h3>
+
+        <p>Wardex v2.1 ships multi-architecture Docker images on GitHub Container Registry. Six targets: linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64, windows/arm64. Entry point accepts all CLI subcommands. Exit codes preserved.</p>
+
+        <pre><code>docker pull ghcr.io/had-nu/wardex:2.1.1
+docker run ghcr.io/had-nu/wardex:2.1.1 wardex evaluate \
+  --config wardex-config.yaml \
+  --evidence vulns.yaml</code></pre>
+
+        <p>The images are built by GoReleaser and pushed via the release workflow (<code>.goreleaser.yaml</code>, Docker section with <code>extra_files</code> for config templates). Each image contains the same single binary — no init process, no sidecars. Suitable for ephemeral CI runners.</p>
+
+        <h3>GitHub Action</h3>
+
+        <p>The repository ships an <code>action.yml</code> that exposes Wardex as a composable GitHub Action. The action builds from <code>Dockerfile</code> in the repo — no external image dependency. Inputs: evidence, config, framework, output-format, output-file.</p>
+
+        <pre><code># .github/workflows/wardex-gate.yml
+jobs:
+  security-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wardex Release Gate
+        uses: had-nu/wardex@v2.1.1
+        with:
+          evidence: vulns.yaml
+          config: .wardex/config.yaml
+          framework: nist-csf
+
+      - name: Handle exit codes
+        if: failure()
+        run: |
+          case $? in
+            10) echo "BLOCK: Gate risk exceeded" ;;
+            11) echo "GAP: Compliance control missing" ;;
+            12) echo "EXPLOIT: Active vulnerability" ;;
+          esac</code></pre>
+
+        <p>Exit code mapping in <code>pkg/gate/gate.go</code>:</p>
+
+        <table>
+            <tr><th>Code</th><th>Meaning</th><th>When</th></tr>
+            <tr><td>0</td><td>PASS</td><td>Risk within appetite</td></tr>
+            <tr><td>10</td><td>BLOCK</td><td>Gate risk exceeded threshold</td></tr>
+            <tr><td>11</td><td>GAP_WARN</td><td>Compliance control not evidenced</td></tr>
+            <tr><td>12</td><td>ACTIVE_EXPLOIT</td><td>Actively exploited CVE detected</td></tr>
+        </table>
+
+        <p>Code 12 triggers CRA Article 14 artefact generation (<code>cmd/art14/art14.go</code>). The artefact is HMAC-SHA256 signed with <code>WARDEX_ACCEPT_SECRET</code> and appended to the JSONL audit log. The pipeline must handle the routing — the action provides the exit code, not the notification infrastructure.</p>
+
+        <h3>HTML Report Generation</h3>
+
+        <p><code>wardex assess --output html</code> renders compliance gap analysis as a standalone HTML page. Dark/light mode, SVG risk bars, framework badge summary. Template at <code>pkg/report/templates/report.html</code> (213 lines, embedded via <code>//go:embed</code>).</p>
+
+        <pre><code>wardex assess controls.yaml \
+  --framework iso27001 \
+  --output html \
+  --out-file compliance-posture.html</code></pre>
+
+        <p>Generated page includes: control coverage table, Layer Delta (documented vs implemented), risk heatmap per asset, and Art14 artefact audit trail. No JavaScript runtime required.</p>
+
+        <h3>NIST Cybersecurity Framework 2.0</h3>
+
+        <p>31 controls mapped across Govern, Identify, Protect, Detect, Respond, Recover. File: <code>pkg/catalog/nist_csf.yaml</code>. Same input schema as ISO 27001, NIS2, and DORA — the assess command evaluates all four with a single control inventory:</p>
+
+        <pre><code>wardex assess controls.yaml --framework iso27001   # Existing
+wardex assess controls.yaml --framework nis2       # Existing
+wardex assess controls.yaml --framework dora       # Existing
+wardex assess controls.yaml --framework nist-csf   # v2.1</code></pre>
+
+        <p>Framework-agnostic assessment means one YAML control file serves multiple regulatory regimes. The mapping from control to framework requirement is in the YAML — the engine reads the <code>framework</code> field on each control and filters accordingly (<code>pkg/catalog/catalog.go:30</code>).</p>
+
+        <h3>CycloneDX SBOM and Cosign Signatures</h3>
+
+        <p>Every v2.1 release includes:</p>
+        <ul style="margin-left: 1.5rem; margin-bottom: 1rem;">
+            <li>CycloneDX SBOM (Go dependency tree, generated by GoReleaser CycloneDX SBOM template)</li>
+            <li>Cosign <code>.sig</code> + <code>.crt</code> files per artifact, signed with cosign <code>sign-blob</code> using GitHub OIDC identity</li>
+        </ul>
+
+        <pre><code>cosign verify-blob \
+  --signature wardex-2.1.1-linux-amd64.tar.gz.sig \
+  --certificate wardex-2.1.1-linux-amd64.tar.gz.crt \
+  --certificate-identity-regexp 'https://github.com/had-nu/wardex/.github/workflows/.*' \
+  wardex-2.1.1-linux-amd64.tar.gz</code></pre>
+
+        <p>No SLSA attestation — deferred from the v2.0 hardening spec and not implemented in v2.1. The signing setup (<code>.goreleaser.yaml</code>) uses cosign v3 format with explicit <code>--output-signature</code> and <code>--output-certificate</code> flags.</p>
+
+        <h2>Integration patterns</h2>
+
+        <h3>Self-hosted pipelines</h3>
+
+        <p>The Docker image works with any orchestrator that supports OCI images. Entry point is the binary — no assumptions about storage, networking, or sidecars.</p>
+
+        <pre><code># Dockerfile for pipeline gate
+FROM ghcr.io/had-nu/wardex:2.1.1 AS wardex
+
+FROM alpine:3.20
+COPY --from=wardex /wardex /usr/local/bin/wardex
+COPY wardex-config.yaml controls.yaml /config/
+ENTRYPOINT ["wardex", "evaluate", "--config", "/config/wardex-config.yaml", "--evidence"]</code></pre>
+
+        <p>This pattern copies only the binary — 18 MB static Go binary, no runtime dependencies. Evidence files are provided at invoke time via volume mount or as subsequent arguments.</p>
+
+        <h3>SIEM ingestion</h3>
+
+        <p>Wardex commands accept <code>--output json</code>. The JSON schemas are stable within a major version. Ingestion into Splunk, Elastic, or Datadog requires shipping the JSON output to their respective agents — no native connectors exist.</p>
+
+        <pre><code>wardex evaluate --evidence vulns.yaml --config wardex-config.yaml --output json
+wardex art14 list --output json</code></pre>
+
+        <p>Exit code 12 events produce a JSON record with CVE, EPSS, CVSS, and Art14 artefact ID. The consuming pipeline decides what to do with it.</p>
+
+        <h3>Art14 compliance workflow</h3>
+
+        <p>The artefact lifecycle is CLI-native. No web UI, no database, no ticket system integration.</p>
+
+        <pre><code># Detect active exploit → artefact created automatically
+wardex evaluate --evidence vulns.yaml --config wardex-config.yaml
+
+# Review pending notifications
+wardex art14 list
+
+# Acknowledge within 72h window
+wardex art14 mark-dispatched wardex-art14-CVE-2024-3094-1718882320
+
+# Confirm remediation
+wardex art14 finalize wardex-art14-CVE-2024-3094-1718882320 \
+  --patch-date "$(date -Iseconds)"</code></pre>
+
+        <p>The JSONL audit log (<code>.wardex/audit.log</code>) is the source of truth for the CRA compliance timeline. Each artefact includes <code>cra_status</code> with <code>awareness_timestamp</code>, <code>early_warning_deadline</code>, <code>report_deadline</code>, and <code>correction_deadline</code>. Deadlines are computed from detection timestamp, verified on <code>mark-dispatched</code> and <code>finalize</code>. Expiry detection is available via <code>wardex art14 list --expired</code>.</p>
+
+        <h2>Architectural choices</h2>
+
+        <p><strong>Action builds from source, not from GHCR.</strong> The <code>action.yml</code> uses <code>image: Dockerfile</code> rather than <code>image: docker://ghcr.io/had-nu/wardex:2.1.1</code>. This guarantees the action runs the exact code at the referenced commit — no skew between the action version and the image tag. Cold start is ~1-2 min for the first invocation; subsequent runs on the same runner cache the layer. For security gates that run in parallel with compilation jobs, this is negligible.</p>
+
+        <p><strong>Wardex is a CLI that produces signed artifacts and exit codes.</strong> No daemon, no database, no webhook receiver. The audit log is a JSONL file on the filesystem. The HTML report is a static page. Integration with SIEMs, ticket systems, or notification channels is the consuming pipeline's responsibility — Wardex provides the data (JSON stdout, exit codes, signed artefacts) and the contract (stable schema within a major version). This keeps adoption immediate and troubleshooting trivial.</p>
+
+        <p><strong>SBOM + signing enables, but doesn't enforce, supply-chain verification.</strong> Release artifacts include CycloneDX SBOM and cosign <code>.sig</code> + <code>.crt</code> per binary. Whether the consumer verifies before deployment is their process. The chain stops at "this binary was built by the GitHub Actions workflow at revision X." No SLSA attestation in v2.1 — deferred from the v2.0 hardening spec and not yet implemented.</p>
+
+        <p><strong>Multi-framework support is a data design decision, not a modelling one.</strong> The risk formula (CVSS × EPSS × layer delta) is framework-agnostic. Each control in the YAML declares which frameworks it applies to (<code>pkg/catalog/*.yaml</code>). The assess command filters, not adapts. Adding a framework is a catalog maintenance task, not an engine change.</p>
+
+        <p><strong>No persistent EPSS cache.</strong> Each <code>wardex enrich</code> invocation hits the FIRST.org API. In pipelines scanning hundreds of CVEs, this may cause throttling. File-based caching with TTL is planned for v2.2 and is the subject of an ongoing integration specification for ENISA EUVD data.</p>
+
+        <p><strong>Audit log is ephemeral in CI.</strong> The JSONL artefact log lives in the runner filesystem. Persisting it across pipeline runs requires <code>actions/upload-artifact</code> or equivalent — not built into the tool. Same pattern as the EPSS cache: external state is the environment's concern.</p>
+
+        <blockquote>
+            <p>CRA Article 14 enforcement begins September 2026. Wardex produces the signed, timestamped artefacts that constitute regulatory evidence. The tool's scope is the evidence — the pipeline and compliance workflow around it belong to the operator.</p>
+        </blockquote>
+
+        <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <footer>
+            <div><a href="https://had-nu.github.io/writing/index.html">← Back to writing</a></div>
+            <p style="margin-top: 1rem;">André Ataíde · Security Governance Advisory</p>
+            <p><a href="mailto:andre_ataide@proton.me">andre_ataide@proton.me</a></p>
+            <p style="margin-top: 0.5rem;">
+                <a href="https://github.com/had-nu/">GitHub</a> /
+                <a href="https://www.linkedin.com/in/andre-ataide/">LinkedIn</a> /
+                <a href="https://medium.com/@hadnu">Medium</a> /
+                <a href="https://mastodon.social/@hadnu">Mastodon</a>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
