@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wardex v2.2: Configuration Provenance Link — André Ataíde</title>
+    <meta name="description" content="SHA-256 and BLAKE3 config hashing, chained audit log verification, divergence detection via webhooks for forensically verifiable release gate decisions.">
+    <meta name="author" content="André Ataíde">
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<header>
+    <nav>
+        <a href="/" class="logo">André Ataíde</a>
+        <div class="nav-links">
+            <a href="../writing/index.html" class="active">writing</a>
+        </div>
+    </nav>
+</header>
+<main>
+<article>
+<h1>Wardex v2.2: Configuration Provenance Link — Cryptographic Audit Trails for Risk-Based Release Gates</h1>
+<p><em>Published June 25, 2026</em></p>
+
+<h2>Why CPL?</h2>
+<p>The Wardex release gate decides whether a deployment can proceed based on the <code>wardex-config.yaml</code> in effect. But how do you prove, weeks later, that the configuration that produced that decision was exactly that one, and not something else?</p>
+<p>Without CPL, the audit log says "CVE-2024-XXXX was blocked with risk appetite 6.0" — but does not bind that decision to an immutable version of the config. A team could retroactively alter the configuration to justify past decisions.</p>
+<p>CPL closes this gap by establishing a cryptographic link between:</p>
+<ol>
+<li>The exact config content (canonical YAML hash)</li>
+<li>Each release gate decision (hash embedded in the audit log)</li>
+<li>The temporal sequence of decisions (hash chain across log entries)</li>
+</ol>
+
+<h2>Architecture</h2>
+<pre>
+wardex-config.yaml
+       |
+       v  cpl.ComputeConfigHash()
+[Canonical Hash] ── sha256:1840... or blake3:fe7c...
+       |
+       +---> Audit Entry (config_hash, prev_hash, cli_overrides)
+       +---> Divergence Webhook (fire-and-forget POST to SIEM)
+</pre>
+
+<h2>Canonical YAML Hashing</h2>
+<p>CPL doesn't hash the raw file — it hashes <em>canonical</em> YAML. The parser strips comments, normalizes whitespace, and reorders keys alphabetically. This means semantically identical configs produce the same hash regardless of formatting:</p>
+<pre><code>$ wardex config hash --config wardex-config.yaml
+sha256:1840e526e5bda5a8a79aeede4e48d46288b1236e90b89caee99680436972fdae
+
+$ wardex config hash --config wardex-config.yaml --algorithm blake3
+blake3:fe7c61a3e9f4b188d1b58d4e0c0d98b53f3decd04deff13dc517028ddcf34b02</code></pre>
+<p>Two algorithms are supported. Hashes are always prefixed (<code>sha256:</code> or <code>blake3:</code>) so they are never silently compared across algorithms.</p>
+
+<h2>Chained Audit Log Verification</h2>
+<p>Every <code>wardex-gate-audit.log</code> entry includes a <code>prev_hash</code> field containing the SHA-256 hash of the previous entry's JSON line. The genesis entry uses <code>"genesis"</code> as reference. This creates an immutable chain:</p>
+<pre><code>$ wardex audit verify-chain --audit-log wardex-gate-audit.log
+Audit log hash chain: INTACT</code></pre>
+<p>Any tampering — editing a past entry, removing rows, inserting fake entries — breaks the chain and is immediately detectable.</p>
+
+<h2>Link Verification</h2>
+<p><code>wardex audit verify-link</code> compares config hashes in the audit log against archived configurations:</p>
+<pre><code>$ wardex audit verify-link \
+    --audit-log wardex-gate-audit.log \
+    --config-archive ./config-versions/</code></pre>
+<p>Three possible states per entry:</p>
+<ul>
+<li><strong>OK</strong> — hash matches an archived config (exit 0)</li>
+<li><strong>MISMATCH</strong> — config found, hash differs; tampered after decision (exit 1)</li>
+<li><strong>MISSING</strong> — no archived config produces this hash (exit 1)</li>
+</ul>
+<p>MISMATCH or MISSING entries can trigger a divergence webhook to your SIEM for real-time alerting.</p>
+
+<h2>CLI Overrides in Audit Trail</h2>
+<p>Some CLI flags override config values — <code>--gate-mode aggregate</code>, <code>--fail-above 8.0</code>, <code>--algorithm blake3</code>. Without CPL, these overrides would be invisible in the audit log. CPL records them in the <code>cli_overrides</code> field of every <code>gate.evaluated</code> entry, closing a significant auditability gap.</p>
+
+<h2>Migration from v2.1</h2>
+<p>CPL is additive and fully backward-compatible. Existing <code>wardex-gate-audit.log</code> files without hash fields will be flagged during verify-chain (missing prev_hash), but the evaluate command continues to write new entries with the full CPL fields. The new CLI commands — <code>config hash</code>, <code>audit verify-link</code>, <code>audit verify-chain</code> — are opt-in tools for forensic analysis.</p>
+
+<h2>Specification</h2>
+<p>The complete CPL specification, including all test vectors and integrity checks, is at <a href="https://github.com/had-nu/wardex/blob/main/SPEC-wardex-cpl-v2.2.md">SPEC-wardex-cpl-v2.2.md</a>.</p>
+
+</article>
+</main>
+<footer>
+    <p>André Ataíde · Security Governance Advisory</p>
+    <p class="email"><a href="mailto:andre_ataide@proton.me">andre_ataide@proton.me</a></p>
+    <div class="links">
+        <a href="https://github.com/had-nu" target="_blank">GitHub</a>
+        <span class="sep">/</span>
+        <a href="https://www.linkedin.com/in/andre-ataide/" target="_blank">LinkedIn</a>
+        <span class="sep">/</span>
+        <a href="https://medium.com/@hadnu" target="_blank">Medium</a>
+        <span class="sep">/</span>
+        <a href="https://mastodon.social/@hadnu" target="_blank">Mastodon</a>
+    </div>
+</footer>
+</body>
+</html>
