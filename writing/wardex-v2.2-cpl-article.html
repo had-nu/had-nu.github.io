@@ -120,36 +120,19 @@
 
         <div class="date">June 25, 2026</div>
         <h1>Wardex v2.2: Configuration Provenance Link (CPL), Chained Audit Log Verification, and Divergence Webhooks</h1>
-        <p><em>SHA-256 and BLAKE3 config hashing, chained audit log verification, divergence detection via webhooks, and forensically verifiable release gate decisions.</em></p>
+        <p><em>Canonical YAML hashing, hash chain audit verification, divergence detection via webhooks — and what each means for auditability.</em></p>
 
         <h2>Problem</h2>
 
-        <p>The Wardex release gate decides whether a deployment can proceed based on the <code>wardex-config.yaml</code> in effect. But how do you prove, weeks or months later, that the configuration that produced that decision was exactly that one, and not something else?</p>
+        <p>The Wardex release gate decides whether a deployment can proceed based on <code>wardex-config.yaml</code> in effect. But how do you prove, weeks or months later, that the configuration that produced that decision was exactly that one, and not something else? Without CPL, the audit log says "CVE-2024-XXXX was blocked with risk appetite 6.0" — but does not bind that decision to an immutable version of the configuration. A team could retroactively alter the policy to justify past decisions.</p>
 
-        <p>Without CPL, the audit log says "CVE-2024-XXXX was blocked with risk appetite 6.0" — but does not bind that decision to an immutable version of the configuration. A team could retroactively alter the policy to justify past decisions.</p>
+        <p>v2.2 introduces the Configuration Provenance Link — a cryptographic layer that binds every release gate decision to the exact configuration that produced it. No new risk model, no changes to the evaluation engine. The work is in auditability and forensic traceability.</p>
 
-        <p>CPL closes this gap by establishing a cryptographic link between the exact config content, each release gate decision, and the temporal sequence of those decisions.</p>
+        <h2>What changed</h2>
 
-        <h2>Architecture</h2>
+        <h3>Canonical YAML Hashing (SHA-256 + BLAKE3)</h3>
 
-        <p>Three new packages, three new CLI commands:</p>
-
-        <pre><code>internal/cpl/              Core CPL library
-├── hash.go                ComputeConfigHash: YAML canónico → hash prefixado
-├── chain.go               VerifyChain: hash chain do audit log
-├── verifylink.go          VerifyLink: compara hashes com configs arquivadas
-└── blake3.go              ComputeBLAKE3: wrapper para blake3 library
-
-internal/notification/     Notificações externas
-└── webhook.go             SendDivergenceAlert: POST divergence para SIEM
-
-cmd/configseal/hash.go     wardex config hash
-cmd/audit/verify_link.go   wardex audit verify-link
-cmd/audit/verify_chain.go  wardex audit verify-chain</code></pre>
-
-        <h3>Canonical YAML Hashing</h3>
-
-        <p>CPL doesn't hash the raw file — it hashes <em>canonical</em> YAML. The parser strips comments, normalizes whitespace, and reorders keys alphabetically. This means semantically identical configs produce the same hash regardless of formatting:</p>
+        <p>Wardex v2.2 introduces <code>wardex config hash</code>, which computes a deterministic hash over a configuration file. The hash is computed over canonical YAML — the parser strips comments, normalizes whitespace, and reorders keys alphabetically. This guarantees that semantically identical configs produce the same hash regardless of formatting:</p>
 
         <pre><code>$ wardex config hash --config wardex-config.yaml
 sha256:1840e526e5bda5a8a79aeede4e48d46288b1236e90b89caee99680436972fdae
@@ -157,24 +140,26 @@ sha256:1840e526e5bda5a8a79aeede4e48d46288b1236e90b89caee99680436972fdae
 $ wardex config hash --config wardex-config.yaml --algorithm blake3
 blake3:fe7c61a3e9f4b188d1b58d4e0c0d98b53f3decd04deff13dc517028ddcf34b02</code></pre>
 
-        <p>Two algorithms are supported. BLAKE3 offers 10-15× performance over SHA-256 in software. Hashes are always prefixed (<code>sha256:</code> or <code>blake3:</code>) so they are never silently compared across algorithms.</p>
+        <p>Two algorithms are supported. BLAKE3 offers 10-15x performance over SHA-256 in software. Hashes are always prefixed (<code>sha256:</code> or <code>blake3:</code>) so they are never silently compared across algorithms. Implementation in <code>internal/cpl/hash.go</code> and <code>internal/cpl/blake3.go</code>.</p>
 
         <h3>Chained Audit Log Verification</h3>
 
-        <p>Every <code>wardex-gate-audit.log</code> entry includes a <code>prev_hash</code> field containing the SHA-256 hash of the previous entry's JSON line. The genesis entry uses <code>"genesis"</code> as reference. This creates an immutable chain where any tampering — editing a past entry, removing rows, inserting fake entries — breaks the chain and is immediately detectable:</p>
+        <p>Every <code>wardex-gate-audit.log</code> entry now includes a <code>prev_hash</code> field containing the SHA-256 hash of the previous entry's JSON line. The genesis entry uses <code>"genesis"</code> as reference. The <code>wardex audit verify-chain</code> command validates the full chain sequentially:</p>
 
         <pre><code>$ wardex audit verify-chain --audit-log wardex-gate-audit.log
 Audit log hash chain: INTACT</code></pre>
 
-        <h3>Link Verification</h3>
+        <p>Any tampering — editing a past entry, removing rows, inserting fake entries — breaks the chain and is immediately detectable. Implementation in <code>internal/cpl/chain.go</code>.</p>
 
-        <p><code>wardex audit verify-link</code> compares config hashes in the audit log against archived configurations:</p>
+        <h3>Link Verification Between Audit Log and Config Archive</h3>
+
+        <p>The <code>wardex audit verify-link</code> command compares config hashes recorded in the audit log against a directory of archived configurations:</p>
 
         <pre><code>$ wardex audit verify-link \
     --audit-log wardex-gate-audit.log \
     --config-archive ./config-versions/</code></pre>
 
-        <p>Three possible states per entry:</p>
+        <p>Three states per entry:</p>
 
         <table>
             <tr><th>State</th><th>Meaning</th><th>Exit code</th></tr>
@@ -183,9 +168,11 @@ Audit log hash chain: INTACT</code></pre>
             <tr><td>MISSING</td><td>No archived config produces this hash</td><td>1</td></tr>
         </table>
 
+        <p>Algorithm protection: a <code>sha256:</code> hash is never compared against a <code>blake3:</code> config. Implementation in <code>internal/cpl/verifylink.go</code>.</p>
+
         <h3>Divergence Webhook</h3>
 
-        <p>When MISMATCH or MISSING is detected, the divergence webhook sends a fire-and-forget POST with the full report to a configured SIEM endpoint. The webhook is non-blocking — failures do not affect exit codes. Configurable in <code>wardex-config.yaml</code>:</p>
+        <p>When MISMATCH or MISSING is detected, the verify-link command can notify an external endpoint via fire-and-forget POST. Configurable in <code>wardex-config.yaml</code>:</p>
 
         <pre><code>notifications:
   divergence_webhook:
@@ -193,15 +180,17 @@ Audit log hash chain: INTACT</code></pre>
     auth_env: "WARDEX_SIEM_TOKEN"
     timeout_seconds: 5</code></pre>
 
+        <p>The webhook is non-blocking — failures do not affect exit codes. The notification payload is the full <code>LinkReport</code> JSON with all entries and summary. Implementation in <code>internal/notification/webhook.go</code>.</p>
+
         <h3>CLI Overrides in Audit Trail</h3>
 
-        <p>Some CLI flags override config values — <code>--gate-mode aggregate</code>, <code>--fail-above 8.0</code>, <code>--algorithm blake3</code>. Without CPL, these overrides would be invisible in the audit log. CPL records them in the <code>cli_overrides</code> field of every <code>gate.evaluated</code> entry, closing a significant auditability gap.</p>
+        <p>CLI flags that override config values — <code>--gate-mode aggregate</code>, <code>--fail-above 8.0</code>, <code>--algorithm blake3</code> — are now recorded in the <code>cli_overrides</code> field of every <code>gate.evaluated</code> audit entry. This closes an auditability gap where pipeline invocations with non-default flags were indistinguishable from default invocations in the log.</p>
 
-        <h2>Integration</h2>
+        <h2>Integration patterns</h2>
 
-        <p>CPL is additive and fully backward-compatible with v2.1. Existing <code>wardex-gate-audit.log</code> files without hash fields will be flagged during verify-chain (missing prev_hash), but the evaluate command continues to write new entries with the full CPL fields. The three new CLI commands — <code>config hash</code>, <code>audit verify-link</code>, <code>audit verify-chain</code> — are opt-in tools for forensic analysis.</p>
+        <h3>Scheduled CPL audit workflows</h3>
 
-        <p>The verify-link command is designed for scheduled CI workflows:</p>
+        <p>The verify-link and verify-chain commands are designed for periodic CI execution. A weekly workflow validates that no past configuration has been altered:</p>
 
         <pre><code># .github/workflows/cpl-audit.yml
 on:
@@ -220,19 +209,35 @@ jobs:
       - run: wardex audit verify-chain \
           --audit-log wardex-gate-audit.log</code></pre>
 
-        <h2>Exit codes</h2>
+        <h3>CI/CD config hash recording</h3>
 
-        <table>
-            <tr><th>Code</th><th>Meaning</th><th>When</th></tr>
-            <tr><td>0</td><td>CPL OK</td><td>All entries OK or chain intact</td></tr>
-            <tr><td>1</td><td>CPL Failure</td><td>MISMATCH, MISSING, or broken chain</td></tr>
-            <tr><td>2</td><td>CPL Operational</td><td>File not found, parse error</td></tr>
-            <tr><td>3</td><td>Tampered (strict mode)</td><td>Config hash unavailable with --strict</td></tr>
-        </table>
+        <p>The <code>config hash</code> command integrates into CI pipelines to record the exact configuration version at deploy time:</p>
 
-        <h2>Specification</h2>
+        <pre><code>- name: Record config hash
+  run: |
+    echo "CONFIG_HASH=$(wardex config hash --config wardex-config.yaml)" >> $GITHUB_ENV</code></pre>
 
-        <p>The complete CPL specification, including all test vectors and integrity checks, is at <a href="https://github.com/had-nu/wardex/blob/main/SPEC-wardex-cpl-v2.2.md">SPEC-wardex-cpl-v2.2.md</a>. The full release with release notes, signed binaries, CycloneDX SBOM, and cosign signatures is on <a href="https://github.com/had-nu/wardex/releases/tag/v2.2.0">GitHub Releases</a>.</p>
+        <h3>SIEM divergence ingestion</h3>
+
+        <p>The divergence webhook sends structured JSON to any HTTP endpoint. The payload includes the full LinkReport with per-entry status. Consuming SIEMs can alert on MISMATCH or MISSING entries as security events warranting investigation.</p>
+
+        <h2>Architectural choices</h2>
+
+        <p><strong>Canonical YAML over raw file hashing.</strong> Hashing the raw file would produce different hashes for configs that differ only in whitespace, comment lines, or key ordering — even though the semantic content is identical. The canonical approach (unmarshal → marshal via <code>yaml.v3</code>) normalizes all formatting differences before hashing, producing a content-addressable hash that is reproducible across environments and tools.</p>
+
+        <p><strong>BLAKE3 as optional alternative, not replacement.</strong> SHA-256 remains the default for maximum interoperability with legacy systems and tooling. BLAKE3 is offered as an opt-in via <code>--algorithm blake3</code> for environments that need the performance gain. The prefix convention (<code>sha256:</code> vs <code>blake3:</code>) prevents silent cross-algorithm comparison — a defence-in-depth measure against hash confusion.</p>
+
+        <p><strong>Fire-and-forget webhook.</strong> The divergence notification is an alert, not a gate. Blocking the pipeline on webhook delivery would create an unnecessary failure domain. The exit code is the source of truth for CI/CD decisions; the webhook is a parallel notification channel that can tolerate transient SIEM unavailability.</p>
+
+        <p><strong>No persistent state in audit commands.</strong> verify-link and verify-chain are stateless — they read the audit log and config archive fresh on each invocation. There is no database, no cache, no daemon. This preserves the operational model of Wardex (stateless CLI) and eliminates deployment complexity for the audit layer.</p>
+
+        <p><strong>cli_overrides as structured field, not audit trail string.</strong> Rather than embedding flag information in the human-readable <code>AuditTrail</code> string, CPL records overrides as a typed JSON array (<code>["--gate-mode aggregate", "--algorithm blake3"]</code>). This makes them machine-queryable without parsing prose text, and guarantees that every override is captured — even if the audit trail format changes in a future version.</p>
+
+        <p><strong>CPL is additive and backward-compatible.</strong> Existing <code>wardex-gate-audit.log</code> files without hash fields are flagged by verify-chain but do not block new entries. The evaluate command continues to write new entries with the full CPL fields. No existing workflows break.</p>
+
+        <blockquote>
+            <p>Regulatory frameworks increasingly require demonstrable provenance for automated governance decisions. CRA Article 14, DORA Article 9, and NIS2 Article 21 all mandate audit trails that link decisions to the policies in effect. CPL provides the cryptographic substrate — the pipeline operator provides the archive discipline.</p>
+        </blockquote>
 
         <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e0e0e0;">
 
