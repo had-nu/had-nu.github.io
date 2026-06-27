@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="André Ataíde">
+    <meta name="description" content="Wardex v2.2.1 adds explicit rejection logging and a persistent state store with BLAKE3 hash chain integrity — completing the CRA-ready auditability layer started in v2.2.">
+    <title>Wardex v2.2.1: Explicit Rejection Logging and Persistent State Store — André Ataíde</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+            line-height: 1.6;
+            color: #1a1a1a;
+            background: #fafafa;
+        }
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        header {
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 1rem;
+        }
+        header a {
+            color: #1a1a1a;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        header a:hover { text-decoration: underline; }
+        .breadcrumb {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+        .date { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+        h1 {
+            font-size: 1.8rem;
+            margin: 1.5rem 0 1rem 0;
+            line-height: 1.3;
+        }
+        h2 {
+            font-size: 1.3rem;
+            margin: 2rem 0 1rem 0;
+            margin-top: 2.5rem;
+        }
+        h3 {
+            font-size: 1.1rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: "Monaco", "Menlo", "Ubuntu Mono", "Courier New", monospace;
+            font-size: 0.9rem;
+        }
+        pre {
+            background: #f5f5f5;
+            border-left: 3px solid #ddd;
+            padding: 1rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            border-radius: 4px;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.85rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        table th, table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        table th {
+            background: #f9f9f9;
+            font-weight: 600;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover { text-decoration: underline; }
+        footer {
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e0e0e0;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        footer a {
+            margin-right: 1rem;
+        }
+        .meta { font-size: 0.85rem; color: #999; }
+        blockquote {
+            border-left: 3px solid #ccc;
+            padding-left: 1rem;
+            margin: 1rem 0;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div><a href="https://had-nu.github.io/">André Ataíde</a></div>
+            <div class="breadcrumb"><a href="https://had-nu.github.io/writing/index.html">writing</a></div>
+        </header>
+
+        <div class="date">June 26, 2026</div>
+        <h1>Wardex v2.2.1: Explicit Rejection Logging and Persistent State Store</h1>
+        <p><em>Completing the CRA-ready auditability layer — silent failures become structured logs, and cross-execution memory arrives with BLAKE3 hash chain integrity.</em></p>
+
+        <h2>Context</h2>
+
+        <p>Wardex v2.2 introduced the Configuration Provenance Link (CPL) — cryptographic binding of every release gate decision to the exact configuration that produced it. But auditability has two dimensions: <em>what happened to the config</em> (CPL covers this) and <em>what happened during evaluation</em> (v2.2 did not). Rejections were silent. EPSS score fetch failures were swallowed. Acceptance load errors produced no output. A CRA Article 14 auditor inspecting a wardex run could see the final decision but not the reasoning trail of filtered inputs, skipped artefacts, or degraded data sources.</p>
+
+        <p>v2.2.1 closes this gap. It also introduces a persistent state store that gives Wardex cross-execution memory — the ability to track risk trends, record decisions, and verify its own history with cryptographic integrity.</p>
+
+        <h2>What changed</h2>
+
+        <h3>Explicit Rejection Logging</h3>
+
+        <p>All 26 previously silent rejection behaviors now produce structured stderr messages. A new unified logging package (<code>pkg/ui/logging.go</code>) provides colored, TTY-aware output with severity prefixes:</p>
+
+        <table>
+            <tr><th>Prefix</th><th>Color</th><th>Meaning</th></tr>
+            <tr><td><code>[FAIL]</code></td><td>Red+Bold</td><td>Fatal error</td></tr>
+            <tr><td><code>[WARN]</code></td><td>Yellow</td><td>Operational warning</td></tr>
+            <tr><td><code>[INFO]</code></td><td>Cyan</td><td>Contextual information</td></tr>
+            <tr><td><code>[HINT]</code></td><td>Cyan</td><td>Resolution suggestion</td></tr>
+            <tr><td><code>[REJECT]</code></td><td>Red+Bold</td><td>Denied acceptance</td></tr>
+        </table>
+
+        <p>Critical path changes:</p>
+
+        <p><strong>Acceptance loading</strong> — <code>accept.Load()</code> now accepts an <code>io.Writer</code> parameter and logs every rejected acceptance (expired, tampered, config-changed, report-mismatch) as <code>[REJECT]</code>. Previously, a team running <code>wardex evaluate</code> against a stale acceptance would see a generic failure. Now they see exactly why: <code>[REJECT] acceptance expired: valid_until 2026-06-20, current 2026-06-26</code>.</p>
+
+        <p><strong>EPSS score fetching</strong> — <code>epss.FetchScores()</code> logs malformed scores and out-of-range values as <code>[WARN]</code> instead of silently dropping them. When EPSS data is degraded, the operator knows the risk score may be less precise.</p>
+
+        <p><strong>SBOM processing</strong> — CycloneDX logs empty component IDs and missing CVSS scores. The Grype converter tracks and logs empty/duplicate CVE skips. OpenVEX logs unrecognized state drops. Each skipped artefact is now visible in the output.</p>
+
+        <p><strong>Policy and trust operations</strong> — The trust store logs admin key decode failures. The policy loader logs new file creation. The maturity scorer logs unknown domains. The analyzer gap checker logs nonexistent control references.</p>
+
+        <p><strong>Breaking change:</strong> <code>accept.Load()</code> and <code>epss.FetchScores()</code> signatures changed to accept <code>io.Writer</code>. All callers have been updated.</p>
+
+        <h3>Persistent State Store</h3>
+
+        <p>A new <code>pkg/statestore/</code> package (10 files, ~1,200 lines) provides cross-execution memory with BLAKE3 hash chain integrity and optional WORM (Write Once Read Many) protection. Every decision Wardex makes is recorded, chained, and verifiable.</p>
+
+        <p>The state store records three types of data: individual decisions (CVE blocked/allowed, risk score, timestamp), trend points (aggregated risk over time), and chain entries (BLAKE3 hashes linking each record to its predecessor). The chain is tamper-evident — modifying any past record breaks the hash chain and is detectable via <code>wardex state verify</code>.</p>
+
+        <p>New CLI commands:</p>
+
+<pre><code>$ wardex state status
+State store: enabled
+Chain integrity: VERIFIED
+Records: 847
+Retention: 90 days
+
+$ wardex state history
+DATE       CVE            SCORE  DECISION  HASH
+2026-06-26 CVE-2024-3094  9.8    BLOCKED   a1b2c3...
+2026-06-26 CVE-2024-21626 7.5    BLOCKED   d4e5f6...
+2026-06-25 CVE-2024-1234  3.2    ALLOWED   g7h8i9...
+
+$ wardex state trend
+Risk trend (last 30 days): ▃▅▇▆▅▃▂▁▁▂▃▄▅▆▇▇▆▅▃▂▁▁
+Direction: DECREASING (-12.3%)
+
+$ wardex state dashboard
+┌─────────────────────────────────────────┐
+│  State Store Dashboard                  │
+├─────────────────────────────────────────┤
+│  Chain status:    VERIFIED              │
+│  Total records:   847                   │
+│  Blocked:         234                   │
+│  Allowed:         613                   │
+│  Avg risk score:  4.2                   │
+│  Trend:           DECREASING            │
+│  WORM protection: ENABLED               │
+└─────────────────────────────────────────┘</code></pre>
+
+        <p>WORM protection uses platform-native immutable file attributes: <code>FS_IMMUTABLE_FL</code> via <code>ioctl</code> on Linux, <code>UF_IMMUTABLE</code> on macOS, and <code>FILE_ATTRIBUTE_READONLY</code> on Windows. When enabled, even root cannot modify historical state records without explicitly disabling WORM first.</p>
+
+        <p>Configuration in <code>wardex-config.yaml</code>:</p>
+
+<pre><code>state_store:
+  enabled: true
+  dir: .wardex
+  retention_days: 90
+  worm: true</code></pre>
+
+        <p>The state store integrates with the evaluation engine — when <code>state_store.enabled=true</code>, every <code>wardex evaluate</code> run records the decision. The <code>--trend</code> flag appends a trend analysis to the output.</p>
+
+        <h3>Security Hardening</h3>
+
+        <p>v2.2.1 removes weak cryptographic material that lingered in git history. The HMAC fallback using <code>"REDACTED_WEAK_SECRET_REMOVED"</code> has been excised via <code>filter-repo</code>. Real crypto keys in the <code>your-org/</code> directory have been replaced with templates. The <code>.gitignore</code> now excludes <code>*.pem</code>, <code>*.key</code>, <code>*.p12</code>, <code>.env</code>, <code>.wardex/</code>, <code>*.wexstate</code>, <code>your-org/</code>, <code>wardex-trust.yaml</code>, and <code>wardex.keyring</code>.</p>
+
+        <h3>Documentation and Architecture</h3>
+
+        <p>New architecture documentation includes a 724-line engineering blueprint (<code>doc/architecture/ENGINEERING_BLUEPRINT.md</code>) covering the state store design, and a navigable Mermaid diagram set (<code>doc/architecture/diagrams.html</code>) with 8 architectural views. The technical view document has been extended with a persistent state store section.</p>
+
+        <h2>Integration patterns</h2>
+
+        <h3>CRA-compliant audit pipeline</h3>
+
+        <p>Combined with v2.2's CPL, v2.2.1 enables a complete audit pipeline for CRA Article 14 compliance. The config hash binds decisions to policy; the rejection log explains filtering; the state store records the full history; and the BLAKE3 chain proves nothing was tampered with:</p>
+
+<pre><code># .github/workflows/cra-audit.yml
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: wardex audit verify-chain \
+          --audit-log wardex-gate-audit.log
+      - run: wardex state verify
+      - run: wardex state dashboard</code></pre>
+
+        <h3>Risk trend monitoring</h3>
+
+        <p>The trend analysis enables teams to track whether their risk posture is improving or degrading over time. The sparkline output is designed for terminal dashboards and can be piped to monitoring systems:</p>
+
+<pre><code># Record trend point after each evaluation
+wardex evaluate --config wardex-config.yaml \
+    --sbom ./sbom.json --trend
+
+# Weekly trend report
+wardex state trend --days 7</code></pre>
+
+        <h3>WORM-protected compliance archives</h3>
+
+        <p>For regulated environments where audit records must be immutable, enabling WORM ensures that historical state cannot be altered — not by accident, not by malice, not even by a compromised root account. The <code>wardex state cleanup</code> command respects WORM: it can only remove records whose retention period has expired, and only when WORM is explicitly disabled for the cleanup operation.</p>
+
+        <h2>Architectural choices</h2>
+
+        <p><strong>Structured logging over ad-hoc fmt.Printf.</strong> A unified logging package ensures consistent formatting, color coding, and severity classification across all 26 rejection points. The <code>io.Writer</code> interface allows test capture without TTY coupling. This is not cosmetic — structured logs are machine-parseable, enabling SIEM ingestion of the evaluation reasoning trail.</p>
+
+        <p><strong>BLAKE3 hash chain over Merkle tree.</strong> A linear hash chain is simpler to verify, cheaper to append, and sufficient for the write-once-read-many access pattern of audit state. Merkle trees offer efficient partial verification for large datasets — Wardex state records are small enough that full-chain verification is instant.</p>
+
+        <p><strong>WORM as platform-native ioctl, not filesystem layer.</strong> Using <code>FS_IMMUTABLE_FL</code> and <code>UF_IMMUTABLE</code> directly avoids depending on filesystem-specific features (ZFS snapshots, Btrfs cow). The tradeoff is that WORM must be explicitly managed per-file rather than inherited from directory attributes — acceptable for a state store with controlled write paths.</p>
+
+        <p><strong>Opt-in state store, not mandatory.</strong> Teams that do not need cross-execution memory can leave <code>state_store.enabled=false</code>. The evaluation engine works identically with or without state recording. This preserves the zero-config deployment model while offering audit depth for regulated environments.</p>
+
+        <p><strong>Breaking accept.Load() signature for correctness.</strong> Changing the function signature to accept <code>io.Writer</code> is a breaking API change. The alternative — a global logger or package-level configuration — would couple acceptance validation to UI concerns. The explicit writer parameter keeps the dependency graph clean and makes test verification trivial.</p>
+
+        <blockquote>
+            <p>The EU Cyber Resilience Act (CRA) Article 14 requires manufacturers to maintain audit trails for automated compliance decisions. Combined with CPL from v2.2, the explicit logging and persistent state store in v2.2.1 provide the cryptographic and operational substrate for demonstrating that every deployment gate decision was traceable, explainable, and untampered.</p>
+        </blockquote>
+
+        <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <footer>
+            <div><a href="https://had-nu.github.io/writing/index.html">← Back to writing</a></div>
+            <p style="margin-top: 1rem;">André Ataíde · Security Governance Advisory</p>
+            <p><a href="mailto:andre_ataide@proton.me">andre_ataide@proton.me</a></p>
+            <p style="margin-top: 0.5rem;">
+                <a href="https://github.com/had-nu/">GitHub</a> /
+                <a href="https://www.linkedin.com/in/andre-ataide/">LinkedIn</a> /
+                <a href="https://medium.com/@hadnu">Medium</a> /
+                <a href="https://mastodon.social/@hadnu">Mastodon</a>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
