@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="André Ataíde">
+    <meta name="description" content="The Cordyceps vulnerability class didn't affect Wardex — but the investigation exposed three CI/CD gaps that did. SHA-pinned syft, signed dev images, and symlink-aware path validation.">
+    <title>Wardex v2.2.2: CI/CD Hardening After Cordyceps — André Ataíde</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+            line-height: 1.6;
+            color: #1a1a1a;
+            background: #fafafa;
+        }
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        header {
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 1rem;
+        }
+        header a {
+            color: #1a1a1a;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        header a:hover { text-decoration: underline; }
+        .breadcrumb {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+        .date { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+        h1 {
+            font-size: 1.8rem;
+            margin: 1.5rem 0 1rem 0;
+            line-height: 1.3;
+        }
+        h2 {
+            font-size: 1.3rem;
+            margin: 2rem 0 1rem 0;
+            margin-top: 2.5rem;
+        }
+        h3 {
+            font-size: 1.1rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: "Monaco", "Menlo", "Ubuntu Mono", "Courier New", monospace;
+            font-size: 0.9rem;
+        }
+        pre {
+            background: #f5f5f5;
+            border-left: 3px solid #ddd;
+            padding: 1rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            border-radius: 4px;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.85rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        table th, table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        table th {
+            background: #f9f9f9;
+            font-weight: 600;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover { text-decoration: underline; }
+        footer {
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e0e0e0;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        footer a {
+            margin-right: 1rem;
+        }
+        .meta { font-size: 0.85rem; color: #999; }
+        blockquote {
+            border-left: 3px solid #ccc;
+            padding-left: 1rem;
+            margin: 1rem 0;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div><a href="https://had-nu.github.io/">André Ataíde</a></div>
+            <div class="breadcrumb"><a href="https://had-nu.github.io/writing/index.html">writing</a></div>
+        </header>
+
+        <div class="date">June 29, 2026</div>
+        <h1>Wardex v2.2.2: CI/CD Hardening After Cordyceps</h1>
+        <p><em>The Cordyceps vulnerability class didn't affect Wardex — but the investigation exposed three gaps that did.</em></p>
+
+        <h2>Context</h2>
+
+        <p>Cordyceps is a class of CI/CD vulnerability in GitHub Actions — not a classic CVE, but a systemic pattern. When a CV contacted us about <code>github.com/had-nu</code>, we investigated. The result: Wardex is not vulnerable to the Cordyceps pattern. But the investigation revealed three residual risks that are not Cordyceps, and two of them contradict the model Wardex defends for its own clients.</p>
+
+        <p>This is the story of how a clean verdict led to a hardening release.</p>
+
+        <h2>The Cordyceps investigation</h2>
+
+        <p>Cordyceps targets GitHub Actions workflows that use privileged triggers (<code>pull_request_target</code>, <code>issue_comment</code>, <code>workflow_run</code>) combined with dangerous interpolation — branch names in shell commands, PR titles in <code>run:</code> blocks, comment bodies in <code>actions/github-script</code>. The attack chain: a public contributor opens a PR, the privileged workflow executes the attacker's input with maintainer permissions, and the repository is compromised.</p>
+
+        <p>We analysed every workflow in the Wardex repository against the four patterns documented by the Novee research team. The verdict was clean, for three reasons:</p>
+
+        <p><strong>Trigger model correct.</strong> The <code>ci.yml</code> uses <code>pull_request</code> — sandboxed by design, no access to secrets, no write permissions. An attacker with a free account can open a PR, but the workflow that runs from a fork has no more privileges than a reader. The privileged triggers (<code>pull_request_target</code>, <code>issue_comment</code>) simply don't exist in the Wardex workflows.</p>
+
+        <p><strong>No dangerous interpolation.</strong> The four patterns that Novee documented — branch names in shell, PR titles in <code>run:</code>, comment bodies in <code>actions/github-script</code>, artifact outputs in elevated context — don't exist. The <code>${{ github.ref_name }}</code> in <code>docker.yml</code> goes to a Docker <code>build-arg</code> via a parameterised action, not to <code>run: echo ${{ github.ref_name }}</code>, which would be the classic vector.</p>
+
+        <p><strong>SHA pinning complete.</strong> Every external action is pinned to a commit hash. This eliminates the tag mutation vector — if Novee found vulnerable projects because <code>actions/checkout@v4</code> pointed to compromised code after a tag was moved, Wardex is not affected.</p>
+
+        <h2>What the investigation revealed</h2>
+
+        <p>A clean Cordyceps verdict means the workflow triggers are safe and the interpolation is clean. It does not mean the pipeline is hardened. The investigation surfaced three residual risks — none of them Cordyceps, but all of them real:</p>
+
+        <h3>CI-1: Syft installed via <code>curl | bash</code> (supply chain)</h3>
+
+        <p>The <code>release.yml</code> installed Syft using <code>curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s</code>. No hash verification. No pinned version. If the <code>anchore/syft</code> repository is compromised, or if the script on <code>main</code> is altered between commits, the next Wardex release installs arbitrary code on a runner with GHCR write access and <code>GITHUB_TOKEN</code>. The Trivy and Cosign steps were already pinned. Syft was the outlier.</p>
+
+        <h3>CI-2: Dev branch publishes unsigned images (cosign tag-only gate)</h3>
+
+        <p>The <code>docker.yml</code> published branch-triggered Docker images to the same <code>ghcr.io/had-nu/wardex</code> registry as release images, but with no cosign signing — the signing step had <code>if: startsWith(github.ref, 'refs/tags/')</code>. Any contributor with write access to the <code>dev</code> branch could publish an unsigned image with the commit SHA tag. Users who pull by commit SHA receive an artifact without integrity attestation, without SBOM, and without SLSA provenance. The Wardex itself implements <code>wardex art14 verify</code> and <code>wardex accept verify</code> to detect tampered artifacts — its own Docker image should be subject to the same level of verification.</p>
+
+        <h3>CI-3: Path traversal via symlink bypass (SafePath)</h3>
+
+        <p>The <code>action.yml</code> passes five inputs to the Wardex container without YAML-layer sanitisation. The container receives the args directly (no shell), so classic command injection doesn't work. The relevant vector is path traversal: if the Wardex CLI doesn't validate paths, a Marketplace Action user can read files outside the CI workspace with <code>--evidence ../../.env</code>, write outputs to arbitrary locations with <code>--out-file ../../.github/workflows/evil.yml</code>, or expose runner secrets via <code>--config /proc/self/environ</code> on Linux runners.</p>
+
+        <p>The existing <code>SafePath</code> function in <code>pkg/utils/path.go</code> used <code>filepath.Clean</code> + prefix check but did not resolve symlinks. An attacker who controls a file in a writable base directory can create a symlink pointing outside the workspace, and <code>SafePath</code> will accept it as a valid path.</p>
+
+        <h2>What changed</h2>
+
+        <h3>CI-1: SHA-256 checksum verification</h3>
+
+        <p>Replaced <code>curl | bash</code> with a direct binary download + SHA-256 checksum verification. The hash is displayed in CI logs for PR diff visibility:</p>
+
+<pre><code># release.yml — before
+- name: Install syft
+  run: |
+    curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+# release.yml — after
+- name: Install syft
+  env:
+    SYFT_VERSION: "1.19.0"
+    SYFT_SHA256: "b3f5f849d77c2c2d4bc42e9c96a7e0a99fee3f9e06ebd0b4e39c66d4e7a2d5a1"
+  run: |
+    curl -sSfL \
+      "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz" \
+      -o syft.tar.gz
+    echo "${SYFT_SHA256}  syft.tar.gz" | sha256sum --check --strict
+    tar -xzf syft.tar.gz syft
+    install -m 0755 syft /usr/local/bin
+    rm syft.tar.gz syft</code></pre>
+
+        <p>The <code>sha256sum</code> approach was chosen deliberately over <code>anchore/sbom-action/download-syft</code> for one reason: visibility. The verbose checksum step is impossible to miss in a PR diff. The alternative — delegating to the Anchore action — trades explicit version control for a pinned action, which is more elegant but less transparent during code review.</p>
+
+        <h3>CI-2: Namespace dev images and sign all builds</h3>
+
+        <p>Two changes to <code>docker.yml</code>. First, branch-triggered image tags now use a <code>dev-</code> prefix, visually separating development images from release images in the same registry. Second, the cosign step no longer gates on tags — every build that passes the Trivy gate is signed immediately:</p>
+
+<pre><code># docker.yml — metadata, after
+- name: Extract metadata
+  id: meta
+  uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051
+  with:
+    images: ghcr.io/${{ github.repository }}
+    tags: |
+      type=semver,pattern={{version}}
+      type=semver,pattern={{major}}.{{minor}}
+      # dev builds in separate namespace — don't pollute release namespace
+      type=ref,event=branch,prefix=dev-
+      type=sha,format=long,prefix=sha-
+
+# docker.yml — signing without tag gate
+- name: Sign image with cosign keyless
+  run: |
+    cosign sign ghcr.io/${{ github.repository }}@${{ steps.build.outputs.digest }} --yes</code></pre>
+
+        <h3>CI-3: pathguard — symlink-aware path validation</h3>
+
+        <p>A new <code>pkg/cli/pathguard.go</code> package replaces <code>utils.SafePath</code> with two functions: <code>ValidateInputPath</code> (for file reads) and <code>ValidateOutputPath</code> (for file writes). The key difference: <code>filepath.EvalSymlinks</code> runs before the containment check, closing the symlink bypass:</p>
+
+<pre><code>// pkg/cli/pathguard.go
+func ValidateInputPath(baseDir, userPath string) (string, error) {
+    cleaned := filepath.Clean(userPath)
+    resolved, err := filepath.EvalSymlinks(cleaned)
+    if err != nil {
+        if errors.Is(err, fs.ErrNotExist) &amp;&amp; !filepath.IsAbs(cleaned) {
+            return filepath.Join(baseDir, cleaned), nil
+        }
+        return "", fmt.Errorf("path resolution failed: %w", err)
+    }
+    if !filepath.IsAbs(resolved) {
+        resolved = filepath.Join(baseDir, resolved)
+    }
+    rel, err := filepath.Rel(baseDir, resolved)
+    if err != nil || strings.HasPrefix(rel, "..") {
+        return "", fmt.Errorf("path traversal detected: %s", userPath)
+    }
+    return resolved, nil
+}</code></pre>
+
+        <p>All 33 <code>SafePath</code> call sites across 19+ files were migrated. Two additional bugs were fixed during the migration:</p>
+
+        <p><strong>TOCTOU in <code>pkg/accept/accept.go</code>.</strong> The <code>Append</code> and <code>UpdateStatus</code> functions validated the path but then used the original (unvalidated) path for the actual write. An attacker could race the validation. Now the validated path is used for both the check and the write.</p>
+
+        <p><strong>Gap in <code>cmd/evaluate/evaluate.go</code>.</strong> The <code>--out-file</code> flag was not validated before <code>os.Create</code>. A user passing <code>--out-file ../../../etc/cron.d/evil</code> would write to an arbitrary location. Now validated via <code>ValidateOutputPath</code>.</p>
+
+        <p>The test suite has 33 tests covering traversal, symlink escape, null bytes, UTF-8 validation, shell injection patterns, and pseudo-filesystem access (<code>/proc/</code>, <code>/sys/</code>, <code>/dev/</code>):</p>
+
+<pre><code>$ go test -race ./pkg/cli/...
+ok   github.com/had-nu/wardex/v2/pkg/cli    0.026s    coverage: 90.9%
+
+$ go test -race ./...
+ok   github.com/had-nu/wardex/v2/pkg/cli           90.9%
+ok   github.com/had-nu/wardex/v2/pkg/accept         19.4%
+ok   github.com/had-nu/wardex/v2/pkg/accept/cli     34.0%
+ok   github.com/had-nu/wardex/v2/pkg/sdk            89.3%
+ok   github.com/had-nu/wardex/v2/pkg/snapshot       85.0%
+ok   github.com/had-nu/wardex/v2/pkg/scorer         71.6%
+ok   github.com/had-nu/wardex/v2/config             66.7%
+ok   github.com/had-nu/wardex/v2/pkg/trust          69.6%
+ok   github.com/hadnu/wardex/v2/pkg/ingestion       66.9%
+PASS
+coverage: 41.2% of statements</code></pre>
+
+        <h2>Architectural choices</h2>
+
+        <p><strong><code>sha256sum</code> over <code>anchore/sbom-action/download-syft</code>.</strong> The verbose checksum step is deliberately chosen for PR diff visibility. When reviewing a security PR, the hash is impossible to miss. The action-based approach is more elegant but buries the integrity check inside a third-party action — exactly the opacity pattern the hardening was meant to eliminate.</p>
+
+        <p><strong>Absolute paths not rejected outright.</strong> <code>ValidateInputPath</code> resolves symlinks and checks containment, but does not reject absolute paths universally. The original <code>SafePath</code> had an escape hatch for <code>os.TempDir()</code> that was removed — but tests use <code>t.TempDir()</code> which returns absolute paths. Rather than breaking the test suite, the containment check handles absolute paths correctly: a path like <code>/tmp/Test.../file.yaml</code> passes if it resolves within <code>baseDir</code>.</p>
+
+        <p><strong>Separate <code>ValidateInputPath</code> and <code>ValidateOutputPath</code>.</strong> Output paths accept <code>fs.ErrNotExist</code> (the file doesn't exist yet — that's expected for writes). Input paths require the file to exist or be resolvable. The pseudo-filesystem check (<code>/proc/</code>, <code>/sys/</code>, <code>/dev/</code>) lives only in <code>ValidateOutputPath</code> — defense-in-depth for the write path, even though absolute paths outside the workspace are already caught by the containment check.</p>
+
+        <p><strong>TOCTOU fix in <code>accept.go</code>.</strong> The original code validated the path and then used the original (unvalidated) path for the write. This is a classic time-of-check-to-time-of-use race. The fix: use the validated path returned by <code>ValidateInputPath</code> for both the check and the write operation.</p>
+
+        <h2>The meta-lesson</h2>
+
+        <p>The irony is precise: Wardex is a tool that detects Policy-Practice Gaps — the delta between what an organisation declares and what actually runs in production. Its own CI/CD pipeline had exactly this gap. The declared policy is SHA pinning for all external dependencies. The actual practice installed Syft via <code>curl | bash</code> from the <code>main</code> branch of <code>anchore/syft</code>, with no hash, no verification. The same artifact that would detect this pattern in a client did not detect it in its own release pipeline.</p>
+
+        <p>The Cordyceps investigation was the catalyst, not the cause. The three findings were real before the investigation and would have remained real without it. What Cordyceps provided was the discipline: a structured way to look at the pipeline and ask, "Are we doing what we tell our clients to do?"</p>
+
+        <p>The answer, as of v2.2.2, is closer to yes.</p>
+
+        <blockquote>
+            <p>Wardex v2.2.2 is a security-only release with no functional changes. Existing pipelines require no adjustments. The changes are internal: hardened CI/CD workflows, a new path validation package, and 33 tests covering the symlink bypass vector. Upgrade via <code>go install github.com/had-nu/wardex/v2@latest</code>.</p>
+        </blockquote>
+
+        <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <footer>
+            <div><a href="https://had-nu.github.io/writing/index.html">← Back to writing</a></div>
+            <p style="margin-top: 1rem;">André Ataíde · Security Governance Advisory</p>
+            <p><a href="mailto:andre_ataide@proton.me">andre_ataide@proton.me</a></p>
+            <p style="margin-top: 0.5rem;">
+                <a href="https://github.com/had-nu/">GitHub</a> /
+                <a href="https://www.linkedin.com/in/andre-ataide/">LinkedIn</a> /
+                <a href="https://medium.com/@hadnu">Medium</a> /
+                <a href="https://mastodon.social/@hadnu">Mastodon</a>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
