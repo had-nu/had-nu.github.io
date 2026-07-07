@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="author" content="André Ataíde">
-    <meta name="description" content="The Cordyceps vulnerability class didn't affect Wardex — but the investigation exposed three CI/CD gaps that did. SHA-pinned syft, signed dev images, and symlink-aware path validation.">
+    <meta name="description" content="Wardex v2.2.2 release: SHA-pinned syft, signed dev images, symlink-aware path validation, 11 new commands, and provenance attestation for the next major release.">
     <title>Wardex v2.2.2: CI/CD Hardening After Cordyceps — André Ataíde</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -102,7 +102,6 @@
         footer a {
             margin-right: 1rem;
         }
-        .meta { font-size: 0.85rem; color: #999; }
         blockquote {
             border-left: 3px solid #ccc;
             padding-left: 1rem;
@@ -118,62 +117,71 @@
             <div class="breadcrumb"><a href="https://had-nu.github.io/writing/index.html">writing</a></div>
         </header>
 
-        <div class="date">June 29, 2026</div>
+        <div class="date">July 6, 2026</div>
         <h1>Wardex v2.2.2: CI/CD Hardening After Cordyceps</h1>
-        <p><em>The Cordyceps vulnerability class didn't affect Wardex — but the investigation exposed three gaps that did.</em></p>
+        <p><em>The Cordyceps vulnerability class does not affect Wardex. The internal pipeline review, however, identified three gaps that required correction.</em></p>
+
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
 
         <h2>Context</h2>
 
-        <p>Cordyceps is a class of CI/CD vulnerability in GitHub Actions — not a classic CVE, but a systemic pattern. When a CV contacted us about <code>github.com/had-nu</code>, we investigated. The result: Wardex is not vulnerable to the Cordyceps pattern. But the investigation revealed three residual risks that are not Cordyceps, and two of them contradict the model Wardex defends for its own clients.</p>
+        <p>Wardex is a solo research project. All features, hardening, and fixes derive from ongoing threat intelligence analysis and observation of patterns in third-party ecosystems. There are no external production deployments, and the code is hardened against the same patterns the tool detects in other codebases.</p>
 
-        <p>This is the story of how a clean verdict led to a hardening release.</p>
+        <p>The Cordyceps class, documented by Novee Security, describes a systemic vulnerability pattern in GitHub Actions pipelines: workflows using privileged triggers (<code>pull_request_target</code>, <code>issue_comment</code>, <code>workflow_run</code>) combined with user-controlled data interpolation (branch names in shell commands, PR titles in <code>run:</code> blocks, comment bodies in <code>actions/github-script</code>).</p>
 
-        <h2>The Cordyceps investigation</h2>
+        <p>The Novee publication prompted a full internal review of <code>github.com/had-nu/wardex</code> against the documented attack chains. The result: <strong>Wardex is not vulnerable to the Cordyceps pattern</strong>. The investigation, however, revealed three residual risks — none of them Cordyceps, but all relevant to supply chain integrity and CI/CD pipeline hardening.</p>
 
-        <p>Cordyceps targets GitHub Actions workflows that use privileged triggers (<code>pull_request_target</code>, <code>issue_comment</code>, <code>workflow_run</code>) combined with dangerous interpolation — branch names in shell commands, PR titles in <code>run:</code> blocks, comment bodies in <code>actions/github-script</code>. The attack chain: a public contributor opens a PR, the privileged workflow executes the attacker's input with maintainer permissions, and the repository is compromised.</p>
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
 
-        <p>We analysed every workflow in the Wardex repository against the four patterns documented by the Novee research team. The verdict was clean, for three reasons:</p>
+        <h2>Cordyceps Analysis</h2>
 
-        <p><strong>Trigger model correct.</strong> The <code>ci.yml</code> uses <code>pull_request</code> — sandboxed by design, no access to secrets, no write permissions. An attacker with a free account can open a PR, but the workflow that runs from a fork has no more privileges than a reader. The privileged triggers (<code>pull_request_target</code>, <code>issue_comment</code>) simply don't exist in the Wardex workflows.</p>
+        <p>Every workflow in the repository was reviewed against the four patterns documented by Novee. The verdict was negative on three grounds:</p>
 
-        <p><strong>No dangerous interpolation.</strong> The four patterns that Novee documented — branch names in shell, PR titles in <code>run:</code>, comment bodies in <code>actions/github-script</code>, artifact outputs in elevated context — don't exist. The <code>${{ github.ref_name }}</code> in <code>docker.yml</code> goes to a Docker <code>build-arg</code> via a parameterised action, not to <code>run: echo ${{ github.ref_name }}</code>, which would be the classic vector.</p>
+        <ol>
+            <li><strong>Correct trigger model.</strong> <code>ci.yml</code> uses <code>pull_request</code> — sandboxed by design, no secret access, no write permissions. Privileged triggers do not exist in any workflow in this repository.</li>
+            <li><strong>No dangerous interpolation.</strong> None of the documented patterns — branch names in shell, PR titles in <code>run:</code> blocks, comment bodies in <code>actions/github-script</code>, or artifact outputs in elevated contexts — are present. The <code>${{ github.ref_name }}</code> usage in <code>docker.yml</code> is confined to a Docker <code>build-arg</code> via a parameterised action.</li>
+            <li><strong>Complete SHA pinning.</strong> All external actions are pinned to commit hashes, eliminating the tag-mutation vector.</li>
+        </ol>
 
-        <p><strong>SHA pinning complete.</strong> Every external action is pinned to a commit hash. This eliminates the tag mutation vector — if Novee found vulnerable projects because <code>actions/checkout@v4</code> pointed to compromised code after a tag was moved, Wardex is not affected.</p>
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
 
-        <h2>What the investigation revealed</h2>
+        <h2>Gaps Identified</h2>
 
-        <p>A clean Cordyceps verdict means the workflow triggers are safe and the interpolation is clean. It does not mean the pipeline is hardened. The investigation surfaced three residual risks — none of them Cordyceps, but all of them real:</p>
+        <p>A negative Cordyceps verdict does not equate to a hardened pipeline. The review identified three gaps:</p>
 
-        <h3>CI-1: Syft installed via <code>curl | bash</code> (supply chain)</h3>
+        <h3>CI-1: Syft installed via <code>curl | bash</code> — no integrity verification</h3>
 
-        <p>The <code>release.yml</code> installed Syft using <code>curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s</code>. No hash verification. No pinned version. If the <code>anchore/syft</code> repository is compromised, or if the script on <code>main</code> is altered between commits, the next Wardex release installs arbitrary code on a runner with GHCR write access and <code>GITHUB_TOKEN</code>. The Trivy and Cosign steps were already pinned. Syft was the outlier.</p>
+        <p>The <code>release.yml</code> pipeline installed Syft with:</p>
 
-        <h3>CI-2: Dev branch publishes unsigned images (cosign tag-only gate)</h3>
+<pre><code>curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s</code></pre>
 
-        <p>The <code>docker.yml</code> published branch-triggered Docker images to the same <code>ghcr.io/had-nu/wardex</code> registry as release images, but with no cosign signing — the signing step had <code>if: startsWith(github.ref, 'refs/tags/')</code>. Any contributor with write access to the <code>dev</code> branch could publish an unsigned image with the commit SHA tag. Users who pull by commit SHA receive an artifact without integrity attestation, without SBOM, and without SLSA provenance. The Wardex itself implements <code>wardex art14 verify</code> and <code>wardex accept verify</code> to detect tampered artifacts — its own Docker image should be subject to the same level of verification.</p>
+        <p>No version pinning, no hash verification. A compromise of the <code>anchore/syft</code> repository or an unreviewed change to the script on <code>main</code> would result in arbitrary code execution on a runner with GHCR write access and the <code>GITHUB_TOKEN</code>. Trivy and Cosign were already pinned. Syft was the outlier.</p>
 
-        <h3>CI-3: Path traversal via symlink bypass (SafePath)</h3>
+        <h3>CI-2: Branch images published unsigned</h3>
 
-        <p>The <code>action.yml</code> passes five inputs to the Wardex container without YAML-layer sanitisation. The container receives the args directly (no shell), so classic command injection doesn't work. The relevant vector is path traversal: if the Wardex CLI doesn't validate paths, a Marketplace Action user can read files outside the CI workspace with <code>--evidence ../../.env</code>, write outputs to arbitrary locations with <code>--out-file ../../.github/workflows/evil.yml</code>, or expose runner secrets via <code>--config /proc/self/environ</code> on Linux runners.</p>
+        <p><code>docker.yml</code> published branch-triggered images to the same registry as release images (<code>ghcr.io/had-nu/wardex</code>), but without cosign signing — the signing step was gated on <code>if: startsWith(github.ref, 'refs/tags/')</code>.</p>
 
-        <p>The existing <code>SafePath</code> function in <code>pkg/utils/path.go</code> used <code>filepath.Clean</code> + prefix check but did not resolve symlinks. An attacker who controls a file in a writable base directory can create a symlink pointing outside the workspace, and <code>SafePath</code> will accept it as a valid path.</p>
+        <p>Any contributor with write access to the <code>dev</code> branch could publish an unsigned image tagged with a commit SHA, carrying no integrity attestation, no SBOM, and no SLSA provenance. Wardex itself implements <code>wardex art14 verify</code> and <code>wardex accept verify</code> to detect tampered artifacts — its own Docker image should be subject to the same level of verification.</p>
 
-        <h2>What changed</h2>
+        <h3>CI-3: Path traversal via symlink bypass (<code>SafePath</code>)</h3>
 
-        <h3>CI-1: SHA-256 checksum verification</h3>
+        <p>The <code>action.yml</code> passes inputs to the Wardex container without YAML-layer sanitisation. The relevant attack vector is path traversal: if the CLI does not validate paths, a Marketplace Action user can read files outside the workspace with <code>--evidence ../../.env</code>, write outputs to arbitrary locations with <code>--out-file ../../.github/workflows/evil.yml</code>, or expose runner secrets via <code>--config /proc/self/environ</code> on Linux runners.</p>
 
-        <p>Replaced <code>curl | bash</code> with a direct binary download + SHA-256 checksum verification. The hash is displayed in CI logs for PR diff visibility:</p>
+        <p>The existing <code>SafePath</code> function in <code>pkg/utils/path.go</code> used <code>filepath.Clean</code> plus a prefix check, but did <strong>not</strong> resolve symlinks. An attacker who controls a file in a writable base directory can create a symlink pointing outside the workspace, and <code>SafePath</code> would accept it as valid.</p>
 
-<pre><code># release.yml — before
-- name: Install syft
-  run: |
-    curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
 
-# release.yml — after
+        <h2>Fixes Applied</h2>
+
+        <h3>CI-1: SHA-256 verification for Syft download</h3>
+
+        <p>The <code>curl | bash</code> invocation was replaced with a direct binary download and SHA-256 checksum verification:</p>
+
+<pre><code># release.yml — after
 - name: Install syft
   env:
     SYFT_VERSION: "1.19.0"
-    SYFT_SHA256: "b3f5f849d77c2c2d4bc42e9c96a7e0a99fee3f9e06ebd0b4e39c66d4e7a2d5a1"
+    SYFT_SHA256: "1dec148ea36aef68a866e35528974b5dbc106ba0b545f1a262ad977d48294637"
   run: |
     curl -sSfL \
       "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz" \
@@ -183,13 +191,17 @@
     install -m 0755 syft /usr/local/bin
     rm syft.tar.gz syft</code></pre>
 
-        <p>The <code>sha256sum</code> approach was chosen deliberately over <code>anchore/sbom-action/download-syft</code> for one reason: visibility. The verbose checksum step is impossible to miss in a PR diff. The alternative — delegating to the Anchore action — trades explicit version control for a pinned action, which is more elegant but less transparent during code review.</p>
+        <p><code>sha256sum</code> was chosen over <code>anchore/sbom-action/download-syft</code> deliberately: the verification step is explicit and visible in every PR diff, avoiding the opacity of a third-party action.</p>
 
-        <h3>CI-2: Namespace dev images and sign all builds</h3>
+        <h3>CI-2: <code>dev-</code> namespace and sign all builds</h3>
 
-        <p>Two changes to <code>docker.yml</code>. First, branch-triggered image tags now use a <code>dev-</code> prefix, visually separating development images from release images in the same registry. Second, the cosign step no longer gates on tags — every build that passes the Trivy gate is signed immediately:</p>
+        <p>Two changes to <code>docker.yml</code>:</p>
+        <ol>
+            <li>Branch-triggered images now use a <code>dev-</code> namespace prefix, separating them visually from release images.</li>
+            <li>The cosign signing step no longer gates on tags — every build that passes the Trivy gate is signed immediately.</li>
+        </ol>
 
-<pre><code># docker.yml — metadata, after
+<pre><code># docker.yml — metadata
 - name: Extract metadata
   id: meta
   uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051
@@ -198,7 +210,6 @@
     tags: |
       type=semver,pattern={{version}}
       type=semver,pattern={{major}}.{{minor}}
-      # dev builds in separate namespace — don't pollute release namespace
       type=ref,event=branch,prefix=dev-
       type=sha,format=long,prefix=sha-
 
@@ -207,75 +218,95 @@
   run: |
     cosign sign ghcr.io/${{ github.repository }}@${{ steps.build.outputs.digest }} --yes</code></pre>
 
-        <h3>CI-3: pathguard — symlink-aware path validation</h3>
+        <h3>CI-3: <code>pathguard</code> — symlink-aware path validation</h3>
 
-        <p>A new <code>pkg/cli/pathguard.go</code> package replaces <code>utils.SafePath</code> with two functions: <code>ValidateInputPath</code> (for file reads) and <code>ValidateOutputPath</code> (for file writes). The key difference: <code>filepath.EvalSymlinks</code> runs before the containment check, closing the symlink bypass:</p>
+        <p>A new <code>pkg/cli/pathguard.go</code> package replaces <code>utils.SafePath</code> with two functions: <code>ValidateInputPath</code> (reads) and <code>ValidateOutputPath</code> (writes). The key difference: <code>filepath.EvalSymlinks</code> runs <strong>before</strong> the containment check, closing the symlink bypass.</p>
 
-<pre><code>// pkg/cli/pathguard.go
-func ValidateInputPath(baseDir, userPath string) (string, error) {
-    cleaned := filepath.Clean(userPath)
-    resolved, err := filepath.EvalSymlinks(cleaned)
-    if err != nil {
-        if errors.Is(err, fs.ErrNotExist) &amp;&amp; !filepath.IsAbs(cleaned) {
-            return filepath.Join(baseDir, cleaned), nil
-        }
-        return "", fmt.Errorf("path resolution failed: %w", err)
-    }
-    if !filepath.IsAbs(resolved) {
-        resolved = filepath.Join(baseDir, resolved)
-    }
-    rel, err := filepath.Rel(baseDir, resolved)
-    if err != nil || strings.HasPrefix(rel, "..") {
-        return "", fmt.Errorf("path traversal detected: %s", userPath)
-    }
-    return resolved, nil
-}</code></pre>
+        <p>All <strong>33 call sites</strong> of <code>SafePath</code> across <strong>19+ files</strong> were migrated. Two additional bugs were fixed during the migration:</p>
 
-        <p>All 33 <code>SafePath</code> call sites across 19+ files were migrated. Two additional bugs were fixed during the migration:</p>
+        <ul>
+            <li><strong>TOCTOU in <code>pkg/accept/accept.go</code></strong> — <code>Append</code> and <code>UpdateStatus</code> validated the path but used the original (unvalidated) path for writes. The validated path is now used for both operations.</li>
+            <li><strong>Gap in <code>cmd/evaluate/evaluate.go</code></strong> — the <code>--out-file</code> flag was not validated before <code>os.Create</code>. It is now validated via <code>ValidateOutputPath</code>.</li>
+        </ul>
 
-        <p><strong>TOCTOU in <code>pkg/accept/accept.go</code>.</strong> The <code>Append</code> and <code>UpdateStatus</code> functions validated the path but then used the original (unvalidated) path for the actual write. An attacker could race the validation. Now the validated path is used for both the check and the write.</p>
-
-        <p><strong>Gap in <code>cmd/evaluate/evaluate.go</code>.</strong> The <code>--out-file</code> flag was not validated before <code>os.Create</code>. A user passing <code>--out-file ../../../etc/cron.d/evil</code> would write to an arbitrary location. Now validated via <code>ValidateOutputPath</code>.</p>
-
-        <p>The test suite has 33 tests covering traversal, symlink escape, null bytes, UTF-8 validation, shell injection patterns, and pseudo-filesystem access (<code>/proc/</code>, <code>/sys/</code>, <code>/dev/</code>):</p>
+        <p>The test suite includes <strong>33 tests</strong> covering traversal, symlink escape, null bytes, UTF-8 validation, shell injection patterns, and pseudo-filesystem access (<code>/proc/</code>, <code>/sys/</code>, <code>/dev/</code>):</p>
 
 <pre><code>$ go test -race ./pkg/cli/...
-ok   github.com/had-nu/wardex/v2/pkg/cli    0.026s    coverage: 90.9%
+ok      github.com/had-nu/wardex/v2/pkg/cli       0.026s    coverage: 90.9%</code></pre>
 
-$ go test -race ./...
-ok   github.com/had-nu/wardex/v2/pkg/cli           90.9%
-ok   github.com/had-nu/wardex/v2/pkg/accept         19.4%
-ok   github.com/had-nu/wardex/v2/pkg/accept/cli     34.0%
-ok   github.com/had-nu/wardex/v2/pkg/sdk            89.3%
-ok   github.com/had-nu/wardex/v2/pkg/snapshot       85.0%
-ok   github.com/had-nu/wardex/v2/pkg/scorer         71.6%
-ok   github.com/had-nu/wardex/v2/config             66.7%
-ok   github.com/had-nu/wardex/v2/pkg/trust          69.6%
-ok   github.com/hadnu/wardex/v2/pkg/ingestion       66.9%
-PASS
-coverage: 41.2% of statements</code></pre>
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
 
-        <h2>Architectural choices</h2>
+        <h2>New Commands (v2.2.2)</h2>
 
-        <p><strong><code>sha256sum</code> over <code>anchore/sbom-action/download-syft</code>.</strong> The verbose checksum step is deliberately chosen for PR diff visibility. When reviewing a security PR, the hash is impossible to miss. The action-based approach is more elegant but buries the integrity check inside a third-party action — exactly the opacity pattern the hardening was meant to eliminate.</p>
+        <p>Eleven new commands were added in this release:</p>
 
-        <p><strong>Absolute paths not rejected outright.</strong> <code>ValidateInputPath</code> resolves symlinks and checks containment, but does not reject absolute paths universally. The original <code>SafePath</code> had an escape hatch for <code>os.TempDir()</code> that was removed — but tests use <code>t.TempDir()</code> which returns absolute paths. Rather than breaking the test suite, the containment check handles absolute paths correctly: a path like <code>/tmp/Test.../file.yaml</code> passes if it resolves within <code>baseDir</code>.</p>
+        <table>
+            <tr><th>Command</th><th>Description</th></tr>
+            <tr><td><code>wardex trust list</code></td><td>List all keys in the trust store with status, role, and metadata. Table and JSON output.</td></tr>
+            <tr><td><code>wardex trust show &lt;id&gt;</code></td><td>Display detailed information for a specific trust key, including revocation status and signatures.</td></tr>
+            <tr><td><code>wardex trust verify</code></td><td>Verify root signature validity and key status across the entire trust store.</td></tr>
+            <tr><td><code>wardex config show</code></td><td>Display configuration metadata: risk appetite, gate mode, CRA Art.14 status, state store, and SHA-256 hash.</td></tr>
+            <tr><td><code>wardex auth status</code></td><td>Show trust store integrity with admin, active, and revoked key counts.</td></tr>
+            <tr><td><code>wardex auth verify --actor</code></td><td>Verify actor permissions against the trust store, listing all permitted operations.</td></tr>
+            <tr><td><code>wardex contract verify</code></td><td>Compute SHA-256 hash of a contract file and optionally verify against an expected hash. Shows file size and modification time.</td></tr>
+            <tr><td><code>wardex assets inventory</code></td><td>Display ICT asset inventory with criticality, internet exposure, network zone, and owner. Table, JSON, and CSV output.</td></tr>
+            <tr><td><code>wardex hmac sign</code></td><td>Compute HMAC-SHA256 signature for file integrity verification using a secret from the environment.</td></tr>
+            <tr><td><code>wardex convert kev</code></td><td>Convert the CISA KEV catalogue to Wardex YAML format for use with <code>evaluate</code>.</td></tr>
+            <tr><td><code>wardex chain seal</code></td><td>Create a SHA-256 chain seal of all files in a directory for integrity verification.</td></tr>
+        </table>
 
-        <p><strong>Separate <code>ValidateInputPath</code> and <code>ValidateOutputPath</code>.</strong> Output paths accept <code>fs.ErrNotExist</code> (the file doesn't exist yet — that's expected for writes). Input paths require the file to exist or be resolvable. The pseudo-filesystem check (<code>/proc/</code>, <code>/sys/</code>, <code>/dev/</code>) lives only in <code>ValidateOutputPath</code> — defense-in-depth for the write path, even though absolute paths outside the workspace are already caught by the containment check.</p>
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
 
-        <p><strong>TOCTOU fix in <code>accept.go</code>.</strong> The original code validated the path and then used the original (unvalidated) path for the write. This is a classic time-of-check-to-time-of-use race. The fix: use the validated path returned by <code>ValidateInputPath</code> for both the check and the write operation.</p>
+        <h2>Provenance Attestation — Preview for v2.3.0</h2>
 
-        <h2>The meta-lesson</h2>
+        <p>The v2.2.2 release ships with a signed provenance manifest as a technology preview. The manifest contains BLAKE3 hashes of all 113 source files, signed with an Ed25519 key. This attestation was generated using the v2.3.0 provenance sub-module, currently under development.</p>
 
-        <p>The irony is precise: Wardex is a tool that detects Policy-Practice Gaps — the delta between what an organisation declares and what actually runs in production. Its own CI/CD pipeline had exactly this gap. The declared policy is SHA pinning for all external dependencies. The actual practice installed Syft via <code>curl | bash</code> from the <code>main</code> branch of <code>anchore/syft</code>, with no hash, no verification. The same artifact that would detect this pattern in a client did not detect it in its own release pipeline.</p>
+        <p>The rationale for including provenance in a CI/CD hardening release is twofold:</p>
 
-        <p>The Cordyceps investigation was the catalyst, not the cause. The three findings were real before the investigation and would have remained real without it. What Cordyceps provided was the discipline: a structured way to look at the pipeline and ask, "Are we doing what we tell our clients to do?"</p>
+        <ol>
+            <li><strong>Dogfooding</strong> — validating the provenance tooling against a real release before it ships as a built-in feature. The manifest generation uncovered a filepath.Match bug (hand-rolled globbing did not handle <code>*.go</code> correctly) that was fixed before the v2.3.0 branch freeze.</li>
+            <li><strong>Release integrity</strong> — the same release that closes CI-1, CI-2, and CI-3 now carries its own integrity attestation. Anyone verifying the source tree can confirm that the code matches the official release, independently of GitHub's own checksums.</li>
+        </ol>
 
-        <p>The answer, as of v2.2.2, is closer to yes.</p>
+        <p>Starting in v2.3.0, provenance attestation will be built into the Wardex CLI itself — no separate binary, no separate workflow. The <code>wardex provenance seal</code> and <code>wardex provenance verify</code> commands will generate and validate signed manifests for any directory, with optional Bitcoin anchoring via OpenTimestamps and Ethereum/Polygon anchoring via a smart contract.</p>
 
         <blockquote>
-            <p>Wardex v2.2.2 is a security-only release with no functional changes. Existing pipelines require no adjustments. The changes are internal: hardened CI/CD workflows, a new path validation package, and 33 tests covering the symlink bypass vector. Upgrade via <code>go install github.com/had-nu/wardex/v2@latest</code>.</p>
+            <p><strong>Signing public key (ed25519):</strong><br>
+            <code>ed25519:HsD9e6BB2LlaeKODGqgWUZoflDgdUH1HWTdyWA7dGqE=</code></p>
+            <p><strong>Root hash (BLAKE3, 113 files):</strong><br>
+            <code>sha256:6f972edf99f5457f8fb13668c529f4343dab7a76d20b67ea746ebdf54d910fee</code></p>
         </blockquote>
+
+<pre><code># Verify source tree integrity (requires the v2.3.0 binary)
+immutable-provenance verify \
+  --manifest provenance-manifest-v2.2.2-signed.yaml \
+  --dir /path/to/wardex-v2.2.2</code></pre>
+
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <h2>Architectural Decisions</h2>
+
+        <ul>
+            <li><strong><code>sha256sum</code> over <code>anchore/sbom-action/download-syft</code>.</strong> The explicit checksum step is deliberately visible in PR diffs. A third-party action buries the integrity check behind an opaque abstraction — the same opacity pattern the hardening was designed to eliminate.</li>
+            <li><strong>Absolute paths are not rejected outright.</strong> <code>ValidateInputPath</code> resolves symlinks and checks containment. Absolute paths are accepted if they resolve within <code>baseDir</code> — required for compatibility with temporary directories in tests (<code>t.TempDir()</code>).</li>
+            <li><strong>Separate input and output validation.</strong> <code>ValidateOutputPath</code> accepts <code>fs.ErrNotExist</code> (the file does not yet exist, which is expected for writes). <code>ValidateInputPath</code> requires the file to exist or be resolvable. Pseudo-filesystem checks (<code>/proc/</code>, <code>/sys/</code>, <code>/dev/</code>) are confined to <code>ValidateOutputPath</code> as defence in depth.</li>
+        </ul>
+
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <h2>Lesson</h2>
+
+        <p>The exercise identified a policy-practice gap in the project's own release pipeline. The declared policy is SHA pinning for all external dependencies. The actual practice installed Syft via <code>curl | bash</code> from the <code>main</code> branch of <code>anchore/syft</code> — no hash, no verification.</p>
+
+        <p>Wardex is designed to detect precisely this delta in corporate environments. This release closes the delta for the project itself.</p>
+
+        <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <h2>Upgrade</h2>
+
+<pre><code>go install github.com/had-nu/wardex/v2@latest</code></pre>
+
+        <p>Checksums are available in <code>wardex_2.2.2_checksums.txt</code> from the <a href="https://github.com/had-nu/wardex/releases/tag/v2.2.2">GitHub Release</a>.</p>
 
         <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e0e0e0;">
 
@@ -284,9 +315,9 @@ coverage: 41.2% of statements</code></pre>
             <p style="margin-top: 1rem;">André Ataíde · Security Governance Advisory</p>
             <p><a href="mailto:andre_ataide@proton.me">andre_ataide@proton.me</a></p>
             <p style="margin-top: 0.5rem;">
-                <a href="https://github.com/had-nu/">GitHub</a> /
-                <a href="https://www.linkedin.com/in/andre-ataide/">LinkedIn</a> /
-                <a href="https://medium.com/@hadnu">Medium</a> /
+                <a href="https://github.com/had-nu/">GitHub</a> ·
+                <a href="https://www.linkedin.com/in/andre-ataide/">LinkedIn</a> ·
+                <a href="https://medium.com/@hadnu">Medium</a> ·
                 <a href="https://mastodon.social/@hadnu">Mastodon</a>
             </p>
         </footer>
