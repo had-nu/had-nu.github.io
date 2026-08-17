@@ -161,7 +161,7 @@
 
         <p><code>docker.yml</code> published branch-triggered images to the same registry as release images (<code>ghcr.io/had-nu/wardex</code>), but without cosign signing — the signing step was gated on <code>if: startsWith(github.ref, 'refs/tags/')</code>.</p>
 
-        <p>Any contributor with write access to the <code>dev</code> branch could publish an unsigned image tagged with a commit SHA, carrying no integrity attestation, no SBOM, and no SLSA provenance. Wardex itself implements <code>wardex art14 verify</code> and <code>wardex accept verify</code> to detect tampered artifacts — its own Docker image should be subject to the same level of verification.</p>
+        <p>Wardex is a solo project — there are no external contributors with write access to the repository. The risk, however, is structural rather than interpersonal: an unsigned branch image carrying no integrity attestation, no SBOM, and no SLSA provenance weakens the supply-chain guarantees the project advertises. If write access is ever granted to a collaborator, the gap becomes exploitable immediately. Wardex itself implements <code>wardex art14 verify</code> and <code>wardex accept verify</code> to detect tampered artifacts — its own Docker image should be subject to the same level of verification.</p>
 
         <h3>CI-3: Path traversal via symlink bypass (<code>SafePath</code>)</h3>
 

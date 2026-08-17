@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="André Ataíde">
+    <meta name="description" content="Wardex v2.4.1: code health audit wrap-up (typed Decision, RBAC extraction, dead code removal, test coverage) plus a 3CP provenance-sealed release.">
+    <title>Wardex v2.4.1: Code Health Audit Wrap-Up and Sealed Release — André Ataíde</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+            line-height: 1.6;
+            color: #1a1a1a;
+            background: #fafafa;
+        }
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        header {
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 1rem;
+        }
+        header a {
+            color: #1a1a1a;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        header a:hover { text-decoration: underline; }
+        .breadcrumb {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+        .date { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+        h1 {
+            font-size: 1.8rem;
+            margin: 1.5rem 0 1rem 0;
+            line-height: 1.3;
+        }
+        h2 {
+            font-size: 1.3rem;
+            margin: 2rem 0 1rem 0;
+            margin-top: 2.5rem;
+        }
+        h3 {
+            font-size: 1.1rem;
+            margin: 1.5rem 0 0.75rem 0;
+        }
+        p {
+            margin-bottom: 1rem;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: "Monaco", "Menlo", "Ubuntu Mono", "Courier New", monospace;
+            font-size: 0.9rem;
+        }
+        pre {
+            background: #f5f5f5;
+            border-left: 3px solid #ddd;
+            padding: 1rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            border-radius: 4px;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.85rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        table th, table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        table th {
+            background: #f9f9f9;
+            font-weight: 600;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover { text-decoration: underline; }
+        footer {
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e0e0e0;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        footer a {
+            margin-right: 1rem;
+        }
+        blockquote {
+            border-left: 3px solid #ccc;
+            padding-left: 1rem;
+            margin: 1rem 0;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div><a href="https://had-nu.github.io/">André Ataíde</a></div>
+            <div class="breadcrumb"><a href="https://had-nu.github.io/writing/index.html">writing</a></div>
+        </header>
+
+        <div class="date">July 17, 2026</div>
+        <h1>Wardex v2.4.1: Code Health Audit Wrap-Up and Sealed Release</h1>
+        <p><em>Three audit phases — security, tests, refactor — land in a single maintenance release. The release itself is anchored via the 3CP provenance flow introduced in v2.4.0.</em></p>
+
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <h2>Context</h2>
+
+        <p>A compliance tool is only as trustworthy as its own codebase. v2.4.1 closes a three-phase internal code health audit of the Wardex tree: security hardening, test coverage, and structural refactoring. None of these change user-facing behavior; all of them raise the confidence bar for every release that follows.</p>
+
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <h2>Phase 1 — Security Hardening</h2>
+
+        <p>Ten files were hardened: panic paths replaced with safe returns, <code>os.Exit</code> replaced with a mockable <code>exitFunc</code>, <code>KnownFields(true)</code> enforced on all YAML decoding, <code>MaxBytesReader</code> bounding untrusted reads, gRPC TLS enforced, and test fixtures made overridable.</p>
+
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <h2>Phase 2 — Test Coverage</h2>
+
+        <p>Twenty-five new tests were added across <code>internal/cpl</code>, <code>pkg/epss</code>, and <code>cmd/provenance</code>, bringing coverage of the provenance and canonicalization paths to a verifiable level. All tests pass under <code>-race</code>.</p>
+
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <h2>Phase 3 — Refactor</h2>
+
+        <p>Twenty-four files changed in the structural cleanup:</p>
+
+        <table>
+            <tr><th>Change</th><th>Detail</th></tr>
+            <tr><td>Typed <code>model.Decision</code></td><td>New <code>DecisionAllow</code> / <code>DecisionBlock</code> / <code>DecisionWarn</code> constants replace raw <code>"allow"</code>/<code>"block"</code>/<code>"warn"</code> string comparisons across <code>pkg/releasegate</code>, <code>pkg/statestore</code>, <code>pkg/report</code>, <code>cmd/evaluate</code>, <code>cmd/art14</code>, <code>cmd/aggregate</code>, <code>pkg/accept</code>, and <code>main.go</code>.</td></tr>
+            <tr><td>Dead code removal</td><td>Deprecated <code>exitcodes.Tampered</code> alias removed (superseded by the <code>StoreInconsistent</code> / <code>Tampered</code> split since v2.1.2).</td></tr>
+            <tr><td>Tool relocation</td><td><code>cmd/gen-sbom/</code> moved to <code>tools/gen-sbom/</code> to separate build-time tooling from the CLI command tree.</td></tr>
+            <tr><td>RBAC extraction</td><td>Duplicated profile/RBAC logic extracted into <code>config.ApplyProfile</code>; both <code>main.go</code> and <code>evaluate_helpers.go</code> now use the shared implementation.</td></tr>
+            <tr><td>Exhaustive switches</td><td>All <code>Decision</code> switches made exhaustive to satisfy the <code>exhaustive</code> linter — zero issues.</td></tr>
+        </table>
+
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <h2>Documentation</h2>
+
+        <p>The heuristic scoring formula was removed from both <code>README.md</code> (PT) and <code>README-en.md</code> (EN). The formula was documentation-only and never consumed by the scorer — its presence invited readers to reverse-engineer a function that the engine does not use.</p>
+
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <h2>Sealed Release</h2>
+
+        <p>As with v2.4.0, the release artifacts are anchored via the 3CP provenance flow. The <code>chain-seal-v2.4.1.json</code> manifest records a SHA-256 chain hash over the five release artifacts, submitted to the embedded Gleipnir anchor:</p>
+
+<pre><code>$ wardex provenance seal --dir ./dist --label "release-v2.4.1" -o chain-seal-v2.4.1.json
+Chain seal written to: chain-seal-v2.4.1.json
+  Total files:  5
+  Chain hash:   65aac744766e960460235fcccbba61034182b5223c47d75b6e0be2a3114f2509
+  Anchored:     release-v2.4.1 (block ~0)</code></pre>
+
+        <p>The CI release workflow was also corrected to reference the relocated <code>tools/gen-sbom/</code> path (it had not been updated during the Phase 3 move), so the native SBOM step now succeeds on tagged builds.</p>
+
+        <blockquote>
+            <p>A maintenance release is still a release. v2.4.1 is the first Wardex version whose own pipeline was caught and fixed mid-release — the gen-sbom relocation in Phase 3 had left two workflow files pointing at the old path. The re-pushed tag triggers a clean, fully-sealed build.</p>
+        </blockquote>
+
+        <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <h2>Upgrade</h2>
+
+<pre><code>go install github.com/had-nu/wardex/v2@latest</code></pre>
+
+        <p>Checksums, SBOMs, and the chain-seal manifest are available in the <a href="https://github.com/had-nu/wardex/releases/tag/v2.4.1">GitHub Release</a>.</p>
+
+        <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <footer>
+            <div><a href="https://had-nu.github.io/writing/index.html">← Back to writing</a></div>
+            <p style="margin-top: 1rem;">André Ataíde · Security Governance Advisory</p>
+            <p><a href="mailto:andre_ataide@proton.me">andre_ataide@proton.me</a></p>
+            <p style="margin-top: 0.5rem;">
+                <a href="https://github.com/had-nu/">GitHub</a> ·
+                <a href="https://www.linkedin.com/in/andre-ataide/">LinkedIn</a> ·
+                <a href="https://medium.com/@hadnu">Medium</a> ·
+                <a href="https://mastodon.social/@hadnu">Mastodon</a>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
