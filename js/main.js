@@ -57,9 +57,10 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(data => {
                 const posts = (data && data.posts) || [];
                 const fragment = document.createDocumentFragment();
-                posts.forEach(post => {
+                posts.forEach((post, index) => {
                     const article = document.createElement('article');
                     article.className = 'entry';
+                    article.style.animationDelay = `${index * 90}ms`;
 
                     const heading = document.createElement('h3');
                     const link = document.createElement('a');

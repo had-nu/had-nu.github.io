@@ -6,112 +6,101 @@
     <title>Writing — André Ataíde</title>
     <meta name="description" content="Articles and notes on GRC, Security Engineering, and Open Source.">
     <meta name="author" content="André Ataíde">
-    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/site.css">
 </head>
 <body>
+    <div class="container">
 
-<header>
-    <nav>
-        <a href="/" class="logo">André Ataíde</a>
-        <div class="nav-links">
-            <a href="index.html" class="active">writing</a>
+        <header>
+            <div><a href="/">André Ataíde</a></div>
+            <div class="breadcrumb">writing</div>
+        </header>
+
+        <div class="intro">
+            <p class="page-title">Writing</p>
         </div>
-    </nav>
-</header>
 
-<main>
+        <div class="entries">
 
-<section class="intro">
-    <h1 class="page-title">Writing</h1>
-</section>
+            <h2 class="section-label">Wardex</h2>
 
-<section class="entries">
+            <div class="entry">
+                <h3><a href="wardex-v2.4.1-article.html">Wardex v2.4.1: Code Health Audit Wrap-Up and Sealed Release</a></h3>
+                <p>Three audit phases — security, tests, refactor — land in a maintenance release, anchored via the 3CP provenance flow.</p>
+                <div class="entry-meta">
+                    <span>Jul 17, 2026</span>
+                </div>
+            </div>
 
-    <h2 class="section-label">Wardex</h2>
+            <div class="entry">
+                <h3><a href="wardex-v2.4.0-article.html">Wardex v2.4.0: EU AI Act Framework and Gleipnir-Anchored Releases</a></h3>
+                <p>The EU AI Act (Regulation 2024/1689) arrives as a 31-control framework, and releases gain cryptographic provenance via Gleipnir anchoring.</p>
+                <div class="entry-meta">
+                    <span>Jul 16, 2026</span>
+                </div>
+            </div>
 
-    <article class="entry">
-        <h3><a href="wardex-v2.4.1-article.html">Wardex v2.4.1: Code Health Audit Wrap-Up and Sealed Release</a></h3>
-        <p>Three audit phases — security, tests, refactor — land in a maintenance release, anchored via the 3CP provenance flow.</p>
-        <div class="entry-meta">
-            <span>Jul 17, 2026</span>
+            <div class="entry">
+                <h3><a href="wardex-v2.3.0-article.html">Wardex v2.3.0: Deterministic Canonicalization and 3CP Provenance Attestation</a></h3>
+                <p>CBOR deterministic encoding replaces ad-hoc serialization; CDDL schemas define the envelopes; and tool provenance becomes a cryptographically-bound attestation.</p>
+                <div class="entry-meta">
+                    <span>Jul 17, 2026</span>
+                </div>
+            </div>
+
+            <div class="entry">
+                <h3><a href="wardex-v2.2.2-hardening-article.html">Wardex v2.2.2: CI/CD Hardening After Cordyceps</a></h3>
+                <p>The Cordyceps vulnerability class didn't affect Wardex — but the investigation exposed three gaps that did.</p>
+                <div class="entry-meta">
+                    <span>Jun 29, 2026</span>
+                </div>
+            </div>
+
+            <div class="entry">
+                <h3><a href="wardex-v2.2.1-article.html">Wardex v2.2.1: Explicit Rejection Logging and Persistent State Store</a></h3>
+                <p>Completing the CRA-ready auditability layer — silent failures become structured logs, and cross-execution memory arrives with BLAKE3 hash chain integrity.</p>
+                <div class="entry-meta">
+                    <span>Jun 26, 2026</span>
+                </div>
+            </div>
+
+            <div class="entry">
+                <h3><a href="wardex-v2.2-cpl-article.html">Wardex v2.2: Configuration Provenance Link (CPL), Chained Audit Log Verification, and Divergence Webhooks</a></h3>
+                <p>SHA-256 and BLAKE3 config hashing, chained audit log verification, divergence detection via webhooks, and forensically verifiable release gate decisions.</p>
+                <div class="entry-meta">
+                    <span>Jun 25, 2026</span>
+                </div>
+            </div>
+
+            <div class="entry">
+                <h3><a href="wardex-v2.1-article.html">Wardex v2.1: Containerization, CI/CD Integration, and Multi-Framework Expansion</a></h3>
+                <p>Docker images, GitHub Action, NIST CSF catalog, and HTML reports — what changed and why, grounded in architectural decisions rather than market claims.</p>
+                <div class="entry-meta">
+                    <span>Jun 20, 2026</span>
+                </div>
+            </div>
+
+            <div class="entry">
+                <h3><a href="wardex-v2-cra-evidence.html">Wardex v2.0: CRA Article 14 Evidence, KEV Correlation, and Risk-Driven Release Gates</a></h3>
+                <p>Turning vulnerability scanners into CRA-compliant audit evidence without changing how your team ships.</p>
+                <div class="entry-meta">
+                    <span>Jun 16, 2026</span>
+                </div>
+            </div>
+
         </div>
-    </article>
 
-    <article class="entry">
-        <h3><a href="wardex-v2.4.0-article.html">Wardex v2.4.0: EU AI Act Framework and Gleipnir-Anchored Releases</a></h3>
-        <p>The EU AI Act (Regulation 2024/1689) arrives as a 31-control framework, and releases gain cryptographic provenance via Gleipnir anchoring.</p>
-        <div class="entry-meta">
-            <span>Jul 16, 2026</span>
-        </div>
-    </article>
+        <footer>
+            <p>André Ataíde · Cyber Security Consultant &amp; Advisor</p>
+            <p><a href="mailto:andre_ataide@proton.me">andre_ataide@proton.me</a></p>
+            <p style="margin-top: 0.5rem;">
+                <a href="https://github.com/had-nu/">GitHub</a> ·
+                <a href="https://www.linkedin.com/in/andre-ataide/">LinkedIn</a> ·
+                <a href="https://medium.com/@hadnu">Medium</a> ·
+                <a href="https://mastodon.social/@hadnu">Mastodon</a>
+            </p>
+        </footer>
 
-    <article class="entry">
-        <h3><a href="wardex-v2.3.0-article.html">Wardex v2.3.0: Deterministic Canonicalization and 3CP Provenance Attestation</a></h3>
-        <p>CBOR deterministic encoding replaces ad-hoc serialization; CDDL schemas define the envelopes; and tool provenance becomes a cryptographically-bound attestation.</p>
-        <div class="entry-meta">
-            <span>Jul 17, 2026</span>
-        </div>
-    </article>
-
-    <article class="entry">
-        <h3><a href="wardex-v2.2.2-hardening-article.html">Wardex v2.2.2: CI/CD Hardening After Cordyceps</a></h3>
-        <p>The Cordyceps vulnerability class didn't affect Wardex — but the investigation exposed three gaps that did.</p>
-        <div class="entry-meta">
-            <span>Jun 29, 2026</span>
-        </div>
-    </article>
-
-    <article class="entry">
-        <h3><a href="wardex-v2.2.1-article.html">Wardex v2.2.1: Explicit Rejection Logging and Persistent State Store</a></h3>
-        <p>Completing the CRA-ready auditability layer — silent failures become structured logs, and cross-execution memory arrives with BLAKE3 hash chain integrity.</p>
-        <div class="entry-meta">
-            <span>Jun 26, 2026</span>
-        </div>
-    </article>
-
-    <article class="entry">
-        <h3><a href="wardex-v2.2-cpl-article.html">Wardex v2.2: Configuration Provenance Link (CPL), Chained Audit Log Verification, and Divergence Webhooks</a></h3>
-        <p>SHA-256 and BLAKE3 config hashing, chained audit log verification, divergence detection via webhooks, and forensically verifiable release gate decisions.</p>
-        <div class="entry-meta">
-            <span>Jun 25, 2026</span>
-        </div>
-    </article>
-
-    <article class="entry">
-        <h3><a href="wardex-v2.1-article.html">Wardex v2.1: Containerization, CI/CD Integration, and Multi-Framework Expansion</a></h3>
-        <p>Docker images, GitHub Action, NIST CSF catalog, and HTML reports — what changed and why, grounded in architectural decisions rather than market claims.</p>
-        <div class="entry-meta">
-            <span>Jun 20, 2026</span>
-        </div>
-    </article>
-
-    <article class="entry">
-        <h3><a href="wardex-v2-cra-evidence.html">Wardex v2.0: CRA Article 14 Evidence, KEV Correlation, and Risk-Driven Release Gates</a></h3>
-        <p>Turning vulnerability scanners into CRA-compliant audit evidence without changing how your team ships.</p>
-        <div class="entry-meta">
-            <span>Jun 16, 2026</span>
-        </div>
-    </article>
-
-</section>
-
-</main>
-
-<footer>
-    <p>André Ataíde · Security Governance Advisory</p>
-    <p class="email"><a href="mailto:andre_ataide@proton.me">andre_ataide@proton.me</a></p>
-    <div class="links">
-        <a href="https://github.com/had-nu" target="_blank">GitHub</a>
-        <span class="sep">/</span>
-        <a href="https://www.linkedin.com/in/andre-ataide/" target="_blank">LinkedIn</a>
-        <span class="sep">/</span>
-        <a href="https://medium.com/@hadnu" target="_blank">Medium</a>
-        <span class="sep">/</span>
-        <a href="https://mastodon.social/@hadnu" target="_blank">Mastodon</a>
-        <span class="sep">/</span>
-        <a href="../root/">Root</a>
     </div>
-</footer>
-
 </body>
 </html>
