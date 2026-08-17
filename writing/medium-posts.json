@@ -1,0 +1,34 @@
+{
+  "source": "https://medium.com/feed/@hadnu",
+  "generated": "2026-08-17T17:29:21+00:00",
+  "posts": [
+    {
+      "title": "The Three Translations of Risk",
+      "url": "https://hadnu.medium.com/the-three-translations-of-risk-3090eb2921f5",
+      "date": "2026-07-28",
+      "dateLabel": "Jul 28, 2026",
+      "excerpt": "There is a curious tendency in organizations. We expect governance professionals to translate technology into business language, while technical professionals remain confined to operational execution. That division…"
+    },
+    {
+      "title": "The Limits of Self-Attestation",
+      "url": "https://hadnu.medium.com/the-limits-of-self-attestation-86842dd950f6",
+      "date": "2026-07-16",
+      "dateLabel": "Jul 16, 2026",
+      "excerpt": "On 18 May 2026, Microsoft published a post-mortem of a campaign it tracks as Storm-2949. The account is unusual for what it lacks. No malware family. No zero-day. No forensic artefact that antivirus tooling would have…"
+    },
+    {
+      "title": "The Cost of the Decision Not Taken",
+      "url": "https://hadnu.medium.com/the-cost-of-the-decision-not-taken-1807badb6f78",
+      "date": "2026-06-23",
+      "dateLabel": "Jun 23, 2026",
+      "excerpt": "On 10 October 2023, Citrix published a patch for CVE-2023–4966, a session token disclosure vulnerability in Citrix NetScaler ADC and Gateway with a CVSS of 9.4. CISA issued a formal advisory eight days later.…"
+    },
+    {
+      "title": "Release Decisions as Audit Evidence",
+      "url": "https://hadnu.medium.com/release-decisions-as-audit-evidence-59daa34dc130",
+      "date": "2026-05-10",
+      "dateLabel": "May 10, 2026",
+      "excerpt": "On 7 March 2017, the Apache Software Foundation disclosed CVE-2017–5638, an OGNL injection vulnerability in Struts2 allowing unauthenticated remote code execution. A patched version shipped the next day. Two days later,…"
+    }
+  ]
+}

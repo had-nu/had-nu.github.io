@@ -45,4 +45,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
         sections.forEach(s => observer.observe(s));
     }
+
+    // Latest writing — render posts from writing/medium-posts.json
+    const latestWriting = document.getElementById('latest-writing');
+    if (latestWriting) {
+        fetch('writing/medium-posts.json')
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                const posts = (data && data.posts) || [];
+                const fragment = document.createDocumentFragment();
+                posts.forEach(post => {
+                    const article = document.createElement('article');
+                    article.className = 'entry';
+
+                    const heading = document.createElement('h3');
+                    const link = document.createElement('a');
+                    link.href = post.url;
+                    link.target = '_blank';
+                    link.rel = 'noopener';
+                    link.textContent = post.title;
+                    heading.appendChild(link);
+
+                    if (post.excerpt) {
+                        const excerpt = document.createElement('p');
+                        excerpt.textContent = post.excerpt;
+                        article.appendChild(excerpt);
+                    }
+
+                    const meta = document.createElement('div');
+                    meta.className = 'entry-meta';
+                    const span = document.createElement('span');
+                    span.textContent = `${post.dateLabel || ''} · Medium`;
+                    meta.appendChild(span);
+
+                    article.appendChild(heading);
+                    article.appendChild(meta);
+                    fragment.appendChild(article);
+                });
+                latestWriting.appendChild(fragment);
+            })
+            .catch(() => {
+                // silent fallback — section stays empty if the JSON is missing
+            });
+    }
 });
