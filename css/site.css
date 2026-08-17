@@ -203,6 +203,48 @@ blockquote {
     margin-bottom: 1.75rem;
 }
 
+/* Cards (problems I solve / projects) */
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 1.25rem;
+}
+
+.card h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.4rem;
+}
+
+.card h3 a {
+    text-decoration: none;
+}
+
+.card h3 a:hover {
+    text-decoration: underline;
+}
+
+.card p {
+    font-size: 0.9rem;
+    color: #555;
+    line-height: 1.55;
+    margin-bottom: 0.75rem;
+}
+
+.card .entry-meta {
+    margin-top: auto;
+}
+
 .entry h3 {
     font-size: 1rem;
     font-weight: 500;
