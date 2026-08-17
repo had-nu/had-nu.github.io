@@ -188,11 +188,15 @@ blockquote {
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: #666;
-    margin: 2.5rem 0 1.25rem;
+    border-top: 1px solid #e0e0e0;
+    padding-top: 1.75rem;
+    margin: 3rem 0 1.25rem;
 }
 
 .section-label:first-of-type {
     margin-top: 0;
+    border-top: none;
+    padding-top: 0;
 }
 
 .entry {
